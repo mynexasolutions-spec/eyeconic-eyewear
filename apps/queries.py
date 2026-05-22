@@ -244,7 +244,7 @@ def get_product_detail(product_id):
         product["price"] = base_price if base_price > 0 else float(product.get("price") or 0)
 
     reviews = db.query(
-        """SELECT r.*, (u.first_name || ' ' || u.last_name) AS reviewer_name
+        """SELECT r.*, r.body AS comment, (u.first_name || ' ' || u.last_name) AS reviewer_name
            FROM product_reviews r LEFT JOIN users u ON u.id = r.user_id
            WHERE r.product_id = ? AND r.is_approved = 1
            ORDER BY r.created_at DESC""",

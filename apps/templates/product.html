@@ -225,6 +225,17 @@
     .desc-content { font-size: 1rem; line-height: 1.8; color: var(--mid-gray); max-width: 800px; }
     .desc-content p { margin-bottom: 1rem; }
 
+    /* Star rating selector styles */
+    .star-rating-selector .star-item {
+      transition: color 0.15s, transform 0.15s;
+    }
+    .star-rating-selector .star-item:hover {
+      transform: scale(1.25);
+    }
+    .star-rating-selector .star-item.active {
+      color: var(--gold);
+    }
+
     /* FOOTER */
     footer { background: var(--charcoal); color: rgba(255,255,255,0.65); padding: 5rem 5vw 2rem; text-align: center; }
     .footer-logo { font-family: var(--font-display); font-size: 1.6rem; font-weight: 700; color: #fff; letter-spacing: 0.08em; text-decoration: none; margin-bottom: 1rem; display: inline-block; }
@@ -431,9 +442,66 @@
         gap: 1.5rem;
       }
     }
+    
+    /* FLASH MESSAGES */
+    .flash-container {
+      position: fixed;
+      top: 80px;
+      right: 1rem;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      max-width: 360px;
+    }
+    .flash-msg {
+      padding: 1rem 1.25rem;
+      border-radius: 0.75rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      background: rgba(250, 250, 247, 0.95);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+      border-left: 3px solid var(--gold);
+      transition: opacity 0.4s ease, transform 0.4s ease;
+    }
+    .flash-msg.error {
+      border-left-color: #ef4444;
+    }
+    .flash-msg.success {
+      border-left-color: #22c55e;
+    }
+    .flash-msg span {
+      font-size: 0.9rem;
+      color: var(--charcoal);
+    }
+    .flash-close-btn {
+      background: none;
+      border: none;
+      color: var(--mid-gray);
+      cursor: pointer;
+      font-size: 1.2rem;
+      line-height: 1;
+    }
   </style>
 </head>
 <body>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+  <div class="flash-container">
+    {% for category, message in messages %}
+    <div class="flash-msg {{ category }}" data-flash>
+      <span>{{ message }}</span>
+      <button class="flash-close-btn" onclick="this.parentElement.remove()">&#215;</button>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% endwith %}
 
   {% include 'partials/_navbar.html' %}
 
@@ -571,8 +639,43 @@
         </div>
         {% endfor %}
       {% else %}
-        <p style="color:var(--mid-gray);">No reviews yet.</p>
+        <p style="color:var(--mid-gray); margin-bottom:1.5rem;">No reviews yet.</p>
       {% endif %}
+
+      <!-- Write a review section -->
+      <div style="margin-top:2.5rem; padding-top:2rem; border-top:1px solid var(--light-gray);">
+        {% if current_user %}
+          <h3 style="font-family:var(--font-display); font-size:1.4rem; margin-bottom:1.5rem;">Write a Review</h3>
+          <form action="{{ url_for('checkout.submit_review', product_id=product.id) }}" method="POST" style="display:flex; flex-direction:column; gap:1.2rem; max-width:600px;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+            
+            <div>
+              <label style="font-weight:600; font-size:0.9rem; display:block; margin-bottom:0.4rem;">Your Rating</label>
+              <div class="star-rating-selector" style="display:flex; gap:0.3rem; font-size:1.8rem; color:var(--mid-gray); cursor:pointer; user-select:none;">
+                <span class="star-item" data-val="1">☆</span>
+                <span class="star-item" data-val="2">☆</span>
+                <span class="star-item" data-val="3">☆</span>
+                <span class="star-item" data-val="4">☆</span>
+                <span class="star-item" data-val="5">☆</span>
+              </div>
+              <input type="hidden" name="rating" id="ratingInput" value="" required />
+            </div>
+            
+            <div>
+              <label for="reviewComment" style="font-weight:600; font-size:0.9rem; display:block; margin-bottom:0.4rem;">Review Comment (minimum 10 characters)</label>
+              <textarea name="comment" id="reviewComment" rows="4" placeholder="Share your experience with this frame..." 
+                style="width:100%; padding:0.8rem 1rem; border:1px solid var(--light-gray); border-radius:4px; font-family:inherit; font-size:0.9rem; outline:none; box-sizing:border-box; transition:border-color 0.2s;" required></textarea>
+            </div>
+            
+            <button type="submit" class="btn-primary" style="align-self:flex-start; padding:0.8rem 2rem; font-size:0.85rem; letter-spacing:0.15em; text-transform:uppercase; font-weight:700; border:none; cursor:pointer;">Submit Review</button>
+          </form>
+        {% else %}
+          <div style="background:var(--cream); border:1px dashed var(--light-gray); padding:2rem; text-align:center; border-radius:4px;">
+            <p style="color:var(--mid-gray); margin-bottom:1.2rem;">Please log in to submit a customer review for this product.</p>
+            <a href="{{ url_for('auth.login', next=url_for('public.product_detail', product_id=product.id)) }}" class="btn-primary" style="display:inline-block; padding:0.6rem 1.5rem; text-decoration:none; font-size:0.8rem; letter-spacing:0.1em; text-transform:uppercase; font-weight:700; border-radius:4px;">Login to Review</a>
+          </div>
+        {% endif %}
+      </div>
     </div>
   </div>
 
@@ -819,6 +922,50 @@
           });
         });
       }
+
+      // Star rating selector interaction
+      const stars = document.querySelectorAll('.star-rating-selector .star-item');
+      if (stars.length > 0) {
+        stars.forEach(star => {
+          star.addEventListener('mouseover', function() {
+            const val = parseInt(this.dataset.val);
+            highlightStars(val);
+          });
+          
+          star.addEventListener('mouseleave', function() {
+            const activeVal = parseInt(document.getElementById('ratingInput').value || 0);
+            highlightStars(activeVal);
+          });
+          
+          star.addEventListener('click', function() {
+            const val = parseInt(this.dataset.val);
+            document.getElementById('ratingInput').value = val;
+            highlightStars(val);
+          });
+        });
+      }
+      
+      function highlightStars(count) {
+        document.querySelectorAll('.star-rating-selector .star-item').forEach(star => {
+          const val = parseInt(star.dataset.val);
+          if (val <= count) {
+            star.textContent = '★';
+            star.classList.add('active');
+          } else {
+            star.textContent = '☆';
+            star.classList.remove('active');
+          }
+        });
+      }
+
+      // Flash auto-dismiss
+      setTimeout(() => {
+        document.querySelectorAll('[data-flash]').forEach(el => {
+          el.style.opacity = '0';
+          el.style.transform = 'translateY(-10px)';
+          setTimeout(() => el.remove(), 400);
+        });
+      }, 5000);
     });
 
   </script>

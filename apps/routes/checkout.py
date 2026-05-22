@@ -506,6 +506,11 @@ def submit_review(product_id):
             "INSERT INTO product_reviews (product_id, user_id, rating, body, is_approved) VALUES (?,?,?,?,1)",
             [product_id, uid, rating, comment],
         )
+        try:
+            from queries import get_product_detail
+            get_product_detail.cache_clear()
+        except Exception:
+            pass
         flash("Thank you! Your review has been submitted.", "success")
     except Exception as e:
         flash(f"Error submitting review: {e}", "error")

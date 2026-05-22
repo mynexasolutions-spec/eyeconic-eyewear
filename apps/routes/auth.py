@@ -26,12 +26,10 @@ def login():
         except Exception as e:
             flash(f"Database error: {e}", "error")
             return render_template("login.html")
-        # Temporary bypass for local admin testing
-        is_bypass = (email == "admin@eyeconic.com" and password == "admin123")
-        if not user or (not is_bypass and not bcrypt.checkpw(
+        if not user or not bcrypt.checkpw(
             password[:72].encode("utf-8"),
             user.get("password_hash", "").encode("utf-8")
-        )):
+        ):
             flash("Invalid email or password.", "error")
             return render_template("login.html")
         full_name = f"{user.get('first_name','')} {user.get('last_name','')}".strip()

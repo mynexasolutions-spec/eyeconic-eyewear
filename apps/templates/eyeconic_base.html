@@ -1778,7 +1778,7 @@
   {% if messages %}
   <div class="flash-container">
     {% for category, message in messages %}
-    <div class="flash-msg {{ category }}">
+    <div class="flash-msg {{ category }}" data-flash>
       <span style="font-size:0.88rem; color:var(--charcoal);">{{ message }}</span>
       <button onclick="this.parentElement.remove()"
         style="background:none; border:none; color:var(--mid-gray); cursor:pointer; font-size:1.1rem; line-height:1; flex-shrink:0;">&times;</button>

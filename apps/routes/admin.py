@@ -865,7 +865,7 @@ def register(app):
     def admin_reviews():
         try:
             reviews = db.query("""
-                SELECT r.*, p.name AS product_name, p.id AS product_id,
+                SELECT r.*, r.body AS comment, p.name AS product_name, p.id AS product_id,
                        (u.first_name || ' ' || u.last_name) AS reviewer_name
                 FROM product_reviews r 
                 LEFT JOIN products p ON p.id = r.product_id
@@ -882,8 +882,13 @@ def register(app):
     def admin_review_approve(review_id):
         action = request.form.get("action", "approve")
         try:
-            approved = action == "approve"
+            approved = 1 if action == "approve" else 0
             db.execute("UPDATE product_reviews SET is_approved=? WHERE id=?", [approved, review_id])
+            try:
+                from queries import get_product_detail
+                get_product_detail.cache_clear()
+            except Exception:
+                pass
             flash("Review " + ("approved." if approved else "rejected."), "success")
         except Exception as e:
             flash(f"Error: {e}", "error")
@@ -894,6 +899,11 @@ def register(app):
     def admin_review_delete(review_id):
         try:
             db.execute("DELETE FROM product_reviews WHERE id=?", [review_id])
+            try:
+                from queries import get_product_detail
+                get_product_detail.cache_clear()
+            except Exception:
+                pass
             flash("Review deleted.", "success")
         except Exception as e:
             flash(f"Error: {e}", "error")
