@@ -51,8 +51,8 @@
           </td>
           <td>
             <div style="font-size:0.875rem; color:var(--admin-text); max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
-                 title="{{ review.comment }}">
-              {{ review.comment | truncate(80, True) if review.comment else '—' }}
+                 title="{{ review.body or review.comment or '' }}">
+              {{ (review.body or review.comment) | truncate(80, True) if (review.body or review.comment) else '—' }}
             </div>
           </td>
           <td style="text-align:center;">
