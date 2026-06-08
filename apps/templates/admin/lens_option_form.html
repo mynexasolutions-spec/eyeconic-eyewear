@@ -1,0 +1,50 @@
+{% extends "admin/base.html" %}
+{% block title %}{{ 'Edit Option' if option else 'New Option' }} – StoreAdmin{% endblock %}
+
+{% block content %}
+<div style="margin-bottom:2rem;">
+  <div style="display:flex; align-items:center; gap:0.5rem; color:var(--admin-text-muted); font-size:0.875rem; margin-bottom:1rem;">
+    <a href="{{ url_for('admin_lenses') }}" style="color:var(--admin-primary);">Lenses</a>
+    <span>/</span>
+    <span>{{ lens_type.name }}</span>
+    <span>/</span>
+    <span>{{ 'Edit Option' if option else 'New Option' }}</span>
+  </div>
+  <h1 style="font-size:1.5rem; font-weight:700; color:var(--admin-text-main); margin:0;">
+    {{ 'Edit Option for ' + lens_type.name if option else 'Add Option to ' + lens_type.name }}
+  </h1>
+</div>
+
+<form method="post" action="{% if option %}{{ url_for('admin_lens_option_edit', option_id=option.id) }}{% else %}{{ url_for('admin_lens_option_new', lens_id=lens_type.id) }}{% endif %}" class="admin-card" style="padding:2.5rem; max-width:700px;">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+
+  <div style="margin-bottom:1.5rem;">
+    <label class="admin-label">Option Name *</label>
+    <input type="text" name="name" value="{{ option.name if option else '' }}" placeholder="e.g. Blue Cut 1.60 Essential, Photochromic" required class="admin-input" style="background:#fff;" />
+  </div>
+
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:2rem; margin-bottom:2rem;">
+    <div>
+      <label class="admin-label">Price Modifier (₹) *</label>
+      <input type="number" name="price_modifier" step="0.01" min="0" value="{{ option.price_modifier if option else '0.00' }}" required class="admin-input" style="background:#fff;" />
+      <small style="color:var(--admin-text-muted); display:block; margin-top:0.25rem;">This amount will be added to the base product price.</small>
+    </div>
+    <div>
+      <label class="admin-label">Display Order</label>
+      <input type="number" name="display_order" value="{{ option.display_order if option else '0' }}" class="admin-input" style="background:#fff;" />
+    </div>
+  </div>
+
+  <div style="margin-bottom:2rem;">
+    <label style="display:flex; align-items:center; gap:0.6rem; cursor:pointer;">
+      <input type="checkbox" name="is_active" {% if not option or option.is_active %}checked{% endif %} style="width:18px; height:18px; accent-color:var(--admin-primary);" />
+      <span style="font-weight:600; font-size:0.9rem;">Status Active (Visible to customer)</span>
+    </label>
+  </div>
+
+  <div style="display:flex; gap:1rem; padding-top:1.5rem; border-top:1px solid var(--admin-border);">
+    <button type="submit" class="admin-btn btn-primary" style="padding:0.75rem 2rem; font-weight:700;">Save Option</button>
+    <a href="{{ url_for('admin_lenses') }}" class="admin-btn btn-outline" style="padding:0.75rem 2rem;">Cancel</a>
+  </div>
+</form>
+{% endblock %}

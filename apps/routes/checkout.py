@@ -331,13 +331,14 @@ def checkout():
                         "UPDATE products SET stock_quantity = 0, stock_status = 'out_of_stock' WHERE id = ?", [pid]
                     )
 
+                pres_url = item.get("prescription_url", "")
                 db.execute(
                     """INSERT INTO order_items
                        (id, order_id, product_id, variation_id, quantity,
-                        unit_price, total_price, product_name_snapshot)
-                       VALUES (?,?,?,?,?,?,?,?)""",
+                        unit_price, total_price, product_name_snapshot, prescription_url)
+                       VALUES (?,?,?,?,?,?,?,?,?)""",
                     [str(uuid.uuid4()), order_id, pid, vid or None, qty,
-                     unit_price, unit_price * qty, item.get("name", "")],
+                     unit_price, unit_price * qty, item.get("name", ""), pres_url],
                 )
 
             # Record coupon usage

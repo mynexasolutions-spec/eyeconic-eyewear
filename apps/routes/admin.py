@@ -202,8 +202,8 @@ def register(app):
                     """INSERT INTO products
                        (id, name, slug, sku, type, description, short_description,
                         price, sale_price, stock_quantity, stock_status, manage_stock,
-                        category_id, brand_id, is_featured, is_active)
-                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) RETURNING id""",
+                        category_id, brand_id, is_featured, is_active, is_lens_compatible)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) RETURNING id""",
                     [
                         str(uuid.uuid4()), name, slug, sku,
                         f.get("type", "simple"), f.get("description"), f.get("short_description"),
@@ -211,6 +211,7 @@ def register(app):
                         stock_qty, stock_status, True,
                         f.get("category_id") or None, f.get("brand_id") or None,
                         1 if f.get("is_featured") == "on" else 0, 1 if f.get("is_active", "on") == "on" else 0,
+                        True if f.get("is_lens_compatible") == "on" else False,
                     ]
                 )["id"]
 
@@ -286,15 +287,17 @@ def register(app):
                 sku_input = (f.get("sku") or "").strip()
                 updated_sku = sku_input or product.get("sku") or generate_unique_product_sku(name)
                 db.execute(
-                    """UPDATE products SET name=?, slug=?, sku=?, type=?, description=?,
-                       short_description=?, price=?, sale_price=?, stock_quantity=?, stock_status=?,
-                       category_id=?, brand_id=?, is_featured=?, is_active=? WHERE id=?""",
+                     """UPDATE products SET name=?, slug=?, sku=?, type=?, description=?,
+                        short_description=?, price=?, sale_price=?, stock_quantity=?, stock_status=?,
+                        category_id=?, brand_id=?, is_featured=?, is_active=?, is_lens_compatible=? WHERE id=?""",
                     [
                         name, slug, updated_sku, f.get("type"), f.get("description"),
                         f.get("short_description"), float(f.get("price") or 0), float(f.get("sale_price") or 0) or None,
                         int(f.get("stock_quantity") or 0), f.get("stock_status"),
                         f.get("category_id") or None, f.get("brand_id") or None,
-                        1 if f.get("is_featured") == "on" else 0, 1 if f.get("is_active") == "on" else 0, product_id
+                        1 if f.get("is_featured") == "on" else 0, 1 if f.get("is_active") == "on" else 0,
+                        True if f.get("is_lens_compatible") == "on" else False,
+                        product_id
                     ]
                 )
 
@@ -857,6 +860,168 @@ def register(app):
         except Exception as e:
             flash(f"Error during bulk update: {e}", "error")
         return redirect(url_for("admin_product_variations", product_id=product_id))
+
+    # ── Lenses Management ──────────────────────────────────────────────────────
+
+    @app.route("/admin/lenses")
+    @require_admin
+    def admin_lenses():
+        try:
+            types = db.query("SELECT * FROM lens_types ORDER BY display_order ASC, name ASC")
+            for t in types:
+                t["options"] = db.query(
+                    "SELECT * FROM lens_options WHERE lens_type_id = ? ORDER BY display_order ASC, name ASC",
+                    [t["id"]]
+                )
+        except Exception as e:
+            types = []
+            flash(f"Error: {e}", "error")
+        return render_template("admin/lenses.html", lens_types=types)
+
+    @app.route("/admin/lenses/new", methods=["GET", "POST"])
+    @require_admin
+    def admin_lens_new():
+        if request.method == "POST":
+            name = request.form.get("name")
+            desc = request.form.get("description", "")
+            order = int(request.form.get("display_order") or 0)
+            is_active = 1 if request.form.get("is_active", "on") == "on" else 0
+            
+            image_url = ""
+            img_file = request.files.get("image_file")
+            if img_file and img_file.filename:
+                try:
+                    image_url = handle_upload(img_file)
+                except Exception as e:
+                    flash(f"Image upload failed: {e}", "error")
+
+            if not name:
+                flash("Name is required", "error")
+            else:
+                try:
+                    db.execute(
+                        """INSERT INTO lens_types (id, name, description, image_url, display_order, is_active) 
+                           VALUES (?,?,?,?,?,?)""",
+                        [str(uuid.uuid4()), name, desc, image_url, order, is_active]
+                    )
+                    flash("Lens type created.", "success")
+                    return redirect(url_for("admin_lenses"))
+                except Exception as e:
+                    flash(f"Error: {e}", "error")
+        return render_template("admin/lens_form.html", lens_type=None, action="new")
+
+    @app.route("/admin/lenses/<lens_id>/edit", methods=["GET", "POST"])
+    @require_admin
+    def admin_lens_edit(lens_id):
+        lens_type = db.query_one("SELECT * FROM lens_types WHERE id = ?", [lens_id])
+        if not lens_type:
+            abort(404)
+            
+        if request.method == "POST":
+            name = request.form.get("name")
+            desc = request.form.get("description", "")
+            order = int(request.form.get("display_order") or 0)
+            is_active = 1 if request.form.get("is_active") == "on" else 0
+            
+            image_url = lens_type.get("image_url") or ""
+            img_file = request.files.get("image_file")
+            if img_file and img_file.filename:
+                try:
+                    image_url = handle_upload(img_file)
+                except Exception as e:
+                    flash(f"Image upload failed: {e}", "error")
+
+            if not name:
+                flash("Name is required", "error")
+            else:
+                try:
+                    db.execute(
+                        """UPDATE lens_types SET name=?, description=?, image_url=?, display_order=?, is_active=? 
+                           WHERE id=?""",
+                        [name, desc, image_url, order, is_active, lens_id]
+                    )
+                    flash("Lens type updated.", "success")
+                    return redirect(url_for("admin_lenses"))
+                except Exception as e:
+                    flash(f"Error: {e}", "error")
+        return render_template("admin/lens_form.html", lens_type=lens_type, action="edit")
+
+    @app.route("/admin/lenses/<lens_id>/delete", methods=["POST"])
+    @require_admin
+    def admin_lens_delete(lens_id):
+        try:
+            db.execute("DELETE FROM lens_types WHERE id = ?", [lens_id])
+            flash("Lens type deleted.", "success")
+        except Exception as e:
+            flash(f"Error: {e}", "error")
+        return redirect(url_for("admin_lenses"))
+
+    @app.route("/admin/lenses/<lens_id>/options/new", methods=["GET", "POST"])
+    @require_admin
+    def admin_lens_option_new(lens_id):
+        lens_type = db.query_one("SELECT * FROM lens_types WHERE id = ?", [lens_id])
+        if not lens_type:
+            abort(404)
+            
+        if request.method == "POST":
+            name = request.form.get("name")
+            price = float(request.form.get("price_modifier") or 0.00)
+            order = int(request.form.get("display_order") or 0)
+            is_active = 1 if request.form.get("is_active", "on") == "on" else 0
+            
+            if not name:
+                flash("Name is required", "error")
+            else:
+                try:
+                    db.execute(
+                        """INSERT INTO lens_options (id, lens_type_id, name, price_modifier, display_order, is_active) 
+                           VALUES (?,?,?,?,?,?)""",
+                        [str(uuid.uuid4()), lens_id, name, price, order, is_active]
+                    )
+                    flash("Lens option created.", "success")
+                    return redirect(url_for("admin_lenses"))
+                except Exception as e:
+                    flash(f"Error: {e}", "error")
+        return render_template("admin/lens_option_form.html", option=None, lens_type=lens_type, action="new")
+
+    @app.route("/admin/lenses/options/<option_id>/edit", methods=["GET", "POST"])
+    @require_admin
+    def admin_lens_option_edit(option_id):
+        option = db.query_one("SELECT * FROM lens_options WHERE id = ?", [option_id])
+        if not option:
+            abort(404)
+        lens_type = db.query_one("SELECT * FROM lens_types WHERE id = ?", [option["lens_type_id"]])
+        
+        if request.method == "POST":
+            name = request.form.get("name")
+            price = float(request.form.get("price_modifier") or 0.00)
+            order = int(request.form.get("display_order") or 0)
+            is_active = 1 if request.form.get("is_active") == "on" else 0
+            
+            if not name:
+                flash("Name is required", "error")
+            else:
+                try:
+                    db.execute(
+                        """UPDATE lens_options SET name=?, price_modifier=?, display_order=?, is_active=? 
+                           WHERE id=?""",
+                        [name, price, order, is_active, option_id]
+                    )
+                    flash("Lens option updated.", "success")
+                    return redirect(url_for("admin_lenses"))
+                except Exception as e:
+                    flash(f"Error: {e}", "error")
+        return render_template("admin/lens_option_form.html", option=option, lens_type=lens_type, action="edit")
+
+    @app.route("/admin/lenses/options/<option_id>/delete", methods=["POST"])
+    @require_admin
+    def admin_lens_option_delete(option_id):
+        try:
+            db.execute("DELETE FROM lens_options WHERE id = ?", [option_id])
+            flash("Lens option deleted.", "success")
+        except Exception as e:
+            flash(f"Error: {e}", "error")
+        return redirect(url_for("admin_lenses"))
 
     # ── Reviews ────────────────────────────────────────────────────────────────
 

@@ -60,7 +60,63 @@ def cart_add():
         is_contacts = product.get("category_slug") in ("contacts", "contact-lenses")
         cart = session.get("cart", {})
 
-        if is_contacts and selected_options and "||" in selected_options:
+        # Handle Lenses Customization
+        purchase_mode   = str(request.form.get("purchase_mode", "frame_only")).strip()
+        lens_option_id  = str(request.form.get("lens_option_id", "")).strip()
+        
+        lens_price_modifier = 0.0
+        lens_details = ""
+        prescription_url = ""
+
+        if purchase_mode == "with_lenses" and lens_option_id:
+            lens_opt = db.query_one(
+                """SELECT lo.name as option_name, lo.price_modifier, lt.name as type_name
+                   FROM lens_options lo 
+                   JOIN lens_types lt ON lt.id = lo.lens_type_id
+                   WHERE lo.id = ?""",
+                [lens_option_id]
+            )
+            if lens_opt:
+                lens_price_modifier = float(lens_opt["price_modifier"] or 0.0)
+                lens_details = f"{lens_opt['type_name']} - {lens_opt['option_name']}"
+                
+                if lens_opt["type_name"] != "Zero Power":
+                    prescription_file = request.files.get("prescription")
+                    if prescription_file and prescription_file.filename:
+                        from helpers import handle_upload
+                        prescription_url = handle_upload(prescription_file)
+                        
+                price += lens_price_modifier
+                display_name += f" ({lens_details})"
+                
+                # Determine custom item key so unique prescription files/lenses don't merge
+                item_key = f"{product_id}"
+                if variation_id:
+                    item_key += f"|{variation_id}"
+                if selected_options:
+                    item_key += f"|{selected_options}"
+                item_key += f"|{lens_option_id}"
+                if prescription_url:
+                    import hashlib
+                    url_hash = hashlib.md5(prescription_url.encode('utf-8')).hexdigest()[:6]
+                    item_key += f"|{url_hash}"
+                
+                if item_key in cart:
+                    cart[item_key]["qty"] += qty
+                else:
+                    cart[item_key] = {
+                        "product_id": product_id,
+                        "variation_id": variation_id or None,
+                        "lens_option_id": lens_option_id,
+                        "name": display_name,
+                        "price": price,
+                        "qty": qty,
+                        "image": img,
+                        "sku": sku,
+                        "lens_details": lens_details,
+                        "prescription_url": prescription_url
+                    }
+        elif is_contacts and selected_options and "||" in selected_options:
             # Split into separate entities for each eye (Left / Right boxes)
             boxes = [b.strip() for b in selected_options.split("||")]
             unit_qty = qty // len(boxes) if len(boxes) > 0 else qty

@@ -114,10 +114,24 @@ def product_detail(product_id):
         related = get_related_products(product.get("category_slug", ""), product_id)
     except Exception:
         related = []
+        
+    lens_types = []
+    if product.get("is_lens_compatible"):
+        try:
+            lens_types = db.query("SELECT * FROM lens_types WHERE is_active = 1 ORDER BY display_order ASC, name ASC")
+            for t in lens_types:
+                t["options"] = db.query(
+                    "SELECT * FROM lens_options WHERE lens_type_id = ? AND is_active = 1 ORDER BY display_order ASC, name ASC",
+                    [t["id"]]
+                )
+        except Exception as e:
+            print(f"Error loading lenses: {e}")
+            
     return render_template(
         "product.html",
         product=product, images=images, variations=variations,
         reviews=reviews, attributes=attributes, related=related,
+        lens_types=lens_types,
     )
 
 

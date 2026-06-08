@@ -197,6 +197,68 @@
     .attr-select { width: 100%; padding: 0.8rem 1rem; background: #fff; border: 1.5px solid var(--light-gray); color: var(--charcoal); font-family: var(--font-body); font-size: 0.9rem; outline: none; border-radius: 0; cursor: pointer; transition: border-color 0.2s; margin-bottom: 1rem; }
     .attr-select:focus { border-color: var(--gold); }
 
+    /* LENS CUSTOMIZATION STYLE PACK */
+    .purchase-mode-card {
+      border: 1.5px solid var(--light-gray);
+      padding: 1rem;
+      border-radius: 6px;
+      cursor: pointer;
+      background: #fff;
+      transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+      user-select: none;
+    }
+    .purchase-mode-card:hover {
+      border-color: var(--gold-light);
+    }
+    .purchase-mode-card.active {
+      border-color: var(--gold);
+      background: var(--cream);
+      box-shadow: 0 4px 12px rgba(201, 164, 85, 0.08);
+    }
+    .lens-type-card {
+      border: 1px solid var(--light-gray);
+      padding: 1rem;
+      border-radius: 6px;
+      cursor: pointer;
+      background: #fff;
+      text-align: center;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+    }
+    .lens-type-card:hover {
+      border-color: var(--gold-light);
+      transform: translateY(-2px);
+    }
+    .lens-type-card.active {
+      border-color: var(--gold);
+      background: var(--warm-white);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      font-weight: 700;
+    }
+    .lens-option-row {
+      display: flex;
+      align-items: center;
+      background: #fff;
+      border: 1px solid var(--light-gray);
+      border-radius: 6px;
+      padding: 0.8rem 1rem;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .lens-option-row:hover {
+      border-color: var(--gold-light);
+      background: var(--warm-white);
+    }
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+
     /* ADD TO CART */
     .atc-row { display: flex; gap: 1rem; align-items: stretch; margin-bottom: 1.5rem; flex-wrap: wrap; }
     .qty-box { display: flex; align-items: center; border: 1.5px solid var(--light-gray); background: #fff; border-radius: 4px; overflow: hidden; }
@@ -585,11 +647,82 @@
 
       <!-- ADD TO CART FORM -->
       {% if product.stock_status != 'out_of_stock' %}
-      <form action="{{ url_for('cart.cart_add') }}" method="post" id="addToCartForm">
+      <form action="{{ url_for('cart.cart_add') }}" method="post" id="addToCartForm" enctype="multipart/form-data">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
         <input type="hidden" name="product_id" value="{{ product.id }}" />
         <input type="hidden" name="variation_id" id="cartVariationId" value="" />
         <input type="hidden" name="selected_options" id="cartSelectedOptions" value="" />
+        <input type="hidden" name="purchase_mode" id="cartPurchaseMode" value="frame_only" />
+        <input type="hidden" name="lens_option_id" id="cartLensOptionId" value="" />
+
+        {% if product.is_lens_compatible and lens_types %}
+        <!-- LENS CUSTOMIZATION MODULE -->
+        <div style="margin-bottom: 2rem; border-top: 1px solid var(--light-gray); padding-top: 1.5rem;">
+          <span class="attr-label" style="margin-bottom: 0.8rem;">Select Purchase Option</span>
+          
+          <!-- Buy Mode Selector -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+            <div class="purchase-mode-card active" id="modeCard_frame_only" data-mode="frame_only" onclick="setPurchaseMode('frame_only')">
+              <div style="font-weight: 700; font-size: 1rem; margin-bottom: 0.25rem;">Frame Only</div>
+              <div style="font-size: 0.8rem; color: var(--mid-gray);">Standard frame without lenses</div>
+            </div>
+            <div class="purchase-mode-card" id="modeCard_with_lenses" data-mode="with_lenses" onclick="setPurchaseMode('with_lenses')">
+              <div style="font-weight: 700; font-size: 1rem; margin-bottom: 0.25rem;">Frame + Lenses</div>
+              <div style="font-size: 0.8rem; color: var(--mid-gray);">Add custom prescription or zero power lenses</div>
+            </div>
+          </div>
+
+          <!-- Lens Customization Drawer -->
+          <div id="lensCustomizationDrawer" style="display: none; animation: slideDown 0.3s ease; background: var(--cream); border: 1px solid var(--light-gray); border-radius: 6px; padding: 1.5rem; margin-bottom: 1.5rem;">
+            <span class="attr-label" style="margin-bottom: 0.8rem;">1. Choose Lens Type</span>
+            
+            <!-- Lens Types Grid -->
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.8rem; margin-bottom: 1.5rem;">
+              {% for lt in lens_types %}
+              <div class="lens-type-card" id="typeCard_{{ lt.id }}" data-lens-type-id="{{ lt.id }}" data-lens-type-name="{{ lt.name }}" onclick="selectLensType('{{ lt.id }}')">
+                {% if lt.image_url %}
+                <img src="{{ lt.image_url }}" alt="{{ lt.name }}" style="width: 44px; height: 44px; object-fit: contain; margin-bottom: 0.5rem;" />
+                {% endif %}
+                <div style="font-weight: 600; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em;">{{ lt.name }}</div>
+              </div>
+              {% endfor %}
+            </div>
+
+            <!-- Lens Options Sub-Selection -->
+            {% for lt in lens_types %}
+            <div id="options-container-{{ lt.id }}" class="lens-options-container" style="display: none;">
+              <span class="attr-label" style="margin-bottom: 0.8rem;">2. Select Lenses Package</span>
+              <div style="display: flex; flex-direction: column; gap: 0.6rem;">
+                {% for opt in lt.options %}
+                <label class="lens-option-row" id="optionRow_{{ opt.id }}">
+                  <input type="radio" name="lens_option_radio" value="{{ opt.id }}" data-price="{{ opt.price_modifier }}" data-label="{{ lt.name }} - {{ opt.name }}" onclick="selectLensOption('{{ opt.id }}', {{ opt.price_modifier }}, '{{ lt.name }} - {{ opt.name }}')" style="accent-color: var(--gold); width: 16px; height: 16px;" />
+                  <div style="flex: 1; margin-left: 0.5rem;">
+                    <span style="font-weight: 600; font-size: 0.9rem; color: var(--charcoal);">{{ opt.name }}</span>
+                  </div>
+                  <span style="font-weight: 700; font-size: 0.9rem; color: var(--gold);">+₹{{ "%.0f"|format(opt.price_modifier) }}</span>
+                </label>
+                {% endfor %}
+              </div>
+
+              <!-- Prescription Upload Section (Shown if NOT Zero Power) -->
+              {% if lt.name != 'Zero Power' %}
+              <div style="margin-top: 1.5rem; padding-top: 1.2rem; border-top: 1px dashed var(--light-gray);">
+                <span class="attr-label" style="margin-bottom: 0.5rem;">3. Upload Prescription</span>
+                <p style="font-size: 0.8rem; color: var(--mid-gray); margin-bottom: 0.8rem; line-height: 1.4;">Please upload a clear image/scan of your doctor's prescription (JPEG/PNG/JPG).</p>
+                <div style="position: relative; background: #fff; border: 1.5px dashed var(--light-gray); border-radius: 4px; padding: 1rem; text-align: center; cursor: pointer; transition: border-color 0.2s;">
+                  <input type="file" name="prescription" class="prescriptionFileInput" accept="image/*" onchange="prescriptionFileSelected(this)" style="opacity: 0; position: absolute; top: 0; left: 0; width: 100%; height: 100%; cursor: pointer;" />
+                  <div class="uploadPlaceholder" style="color: var(--mid-gray); font-size: 0.85rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                    <svg xmlns="http://www.w3.org/2000/svg" style="width:18px; height:18px;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                    <span class="uploadLabelText">Choose Prescription File...</span>
+                  </div>
+                </div>
+              </div>
+              {% endif %}
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
         
         <div class="atc-row">
           <div class="qty-box">
@@ -716,6 +849,153 @@
   <script>
     const variations = {{ variations | tojson | safe if variations else '[]' }};
     
+    // LENS CUSTOMIZATION JS LOGIC
+    const basePrice = {{ product.sale_price or product.price or 0 }};
+    let currentLensPrice = 0.00;
+    let purchaseMode = 'frame_only';
+    let selectedLensTypeId = '';
+    let selectedLensTypeName = '';
+    let selectedLensOptionId = '';
+    let selectedLensOptionLabel = '';
+
+    function setPurchaseMode(mode) {
+      purchaseMode = mode;
+      document.getElementById('cartPurchaseMode').value = mode;
+      
+      document.querySelectorAll('.purchase-mode-card').forEach(card => card.classList.remove('active'));
+      const modeCard = document.getElementById('modeCard_' + mode);
+      if (modeCard) modeCard.classList.add('active');
+
+      const drawer = document.getElementById('lensCustomizationDrawer');
+      
+      if (mode === 'with_lenses') {
+        if (drawer) drawer.style.display = 'block';
+        currentLensPrice = 0.00;
+        
+        selectedLensOptionId = '';
+        selectedLensOptionLabel = '';
+        const idInput = document.getElementById('cartLensOptionId');
+        if (idInput) idInput.value = '';
+        
+        document.querySelectorAll('input[name="lens_option_radio"]').forEach(r => r.checked = false);
+        updateAtcState();
+      } else {
+        if (drawer) drawer.style.display = 'none';
+        currentLensPrice = 0.00;
+        selectedLensOptionId = '';
+        selectedLensOptionLabel = '';
+        const idInput = document.getElementById('cartLensOptionId');
+        if (idInput) idInput.value = '';
+        updateAtcState();
+      }
+      recalculatePrice();
+    }
+
+    function selectLensType(typeId) {
+      selectedLensTypeId = typeId;
+      const typeCard = document.getElementById('typeCard_' + typeId);
+      if (typeCard) {
+        selectedLensTypeName = typeCard.dataset.lensTypeName;
+        document.querySelectorAll('.lens-type-card').forEach(card => card.classList.remove('active'));
+        typeCard.classList.add('active');
+      }
+
+      document.querySelectorAll('.lens-options-container').forEach(c => c.style.display = 'none');
+      const container = document.getElementById('options-container-' + typeId);
+      if (container) {
+        container.style.display = 'block';
+        container.style.animation = 'slideDown 0.3s ease';
+      }
+
+      document.querySelectorAll('input[name="lens_option_radio"]').forEach(r => {
+        if (r.closest('.lens-options-container') !== container) {
+          r.checked = false;
+        }
+      });
+
+      if (container) {
+        const checkedRadio = container.querySelector('input[name="lens_option_radio"]:checked');
+        if (checkedRadio) {
+          selectLensOption(checkedRadio.value, parseFloat(checkedRadio.dataset.price), checkedRadio.dataset.label);
+        } else {
+          selectedLensOptionId = '';
+          selectedLensOptionLabel = '';
+          currentLensPrice = 0.00;
+          const idInput = document.getElementById('cartLensOptionId');
+          if (idInput) idInput.value = '';
+          recalculatePrice();
+          updateAtcState();
+        }
+      }
+    }
+
+    function selectLensOption(optionId, priceModifier, label) {
+      selectedLensOptionId = optionId;
+      selectedLensOptionLabel = label;
+      currentLensPrice = parseFloat(priceModifier);
+      const idInput = document.getElementById('cartLensOptionId');
+      if (idInput) idInput.value = optionId;
+
+      recalculatePrice();
+      updateAtcState();
+    }
+
+    function prescriptionFileSelected(input) {
+      const labelText = input.closest('div').querySelector('.uploadLabelText');
+      if (labelText) {
+        if (input.files && input.files[0]) {
+          labelText.textContent = input.files[0].name;
+          labelText.style.color = 'var(--gold)';
+        } else {
+          labelText.textContent = 'Choose Prescription File...';
+          labelText.style.color = '';
+        }
+      }
+      updateAtcState();
+    }
+
+    function recalculatePrice() {
+      const finalPrice = basePrice + currentLensPrice;
+      const priceElem = document.querySelector('.price-main');
+      if (priceElem) {
+        priceElem.textContent = '₹' + Math.round(finalPrice);
+      }
+    }
+
+    function updateAtcState() {
+      const atcBtn = document.getElementById('addToCartBtn');
+      if (!atcBtn) return;
+      
+      const selects = Array.from(document.querySelectorAll('.attr-select'));
+      const variationsFilled = selects.every(s => s.value !== '');
+      
+      if (purchaseMode === 'frame_only') {
+        atcBtn.disabled = !variationsFilled;
+        atcBtn.textContent = variationsFilled ? 'Add to Cart' : 'Select Options';
+      } else {
+        let optionSelected = selectedLensOptionId !== '';
+        
+        let prescriptionOk = true;
+        if (selectedLensTypeName && selectedLensTypeName !== 'Zero Power') {
+          const fileInput = document.querySelector('.prescriptionFileInput');
+          prescriptionOk = fileInput && fileInput.files && fileInput.files.length > 0;
+        }
+        
+        const ok = variationsFilled && optionSelected && prescriptionOk;
+        atcBtn.disabled = !ok;
+        if (!variationsFilled) {
+          atcBtn.textContent = 'Select Options';
+        } else if (!optionSelected) {
+          atcBtn.textContent = 'Choose Lenses';
+        } else if (!prescriptionOk) {
+          atcBtn.textContent = 'Upload Prescription';
+        } else {
+          atcBtn.textContent = 'Add to Cart';
+        }
+      }
+    }
+
+    
     {% if images|length > 1 %}
     const galleryImages = [
       {% for img in images %}
@@ -797,11 +1077,7 @@
 
     function updateVariation() {
       const selects = Array.from(document.querySelectorAll('.attr-select'));
-      const btn = document.getElementById('addToCartBtn');
       const allFilled = selects.every(s => s.value !== '');
-      
-      btn.disabled = !allFilled;
-      btn.textContent = allFilled ? 'Add to Cart' : 'Select Options';
       
       document.getElementById('cartSelectedOptions').value = selects
         .filter(s => s.value)
@@ -813,7 +1089,18 @@
         const match = variations.find(v => v.attribute_value_ids && ids.every(id => v.attribute_value_ids.map(String).includes(id)));
         if (match) document.getElementById('cartVariationId').value = match.id;
       }
+      
+      if (typeof updateAtcState === 'function') {
+        updateAtcState();
+      } else {
+        const btn = document.getElementById('addToCartBtn');
+        if (btn) {
+          btn.disabled = !allFilled;
+          btn.textContent = allFilled ? 'Add to Cart' : 'Select Options';
+        }
+      }
     }
+
 
     // PREMIUM TOAST SYSTEM
     function showToast(title, message, type = 'success') {

@@ -1,0 +1,98 @@
+{% extends "admin/base.html" %}
+{% block title %}Lenses – StoreAdmin{% endblock %}
+
+{% block content %}
+<div class="admin-page-header">
+  <div>
+    <h1 style="font-size:1.5rem; font-weight:700; color:var(--admin-text-main); margin-bottom:0.25rem;">Lens Customization</h1>
+    <p style="color:var(--admin-text-muted); font-size:0.875rem;">Manage global lens packages, sub-options, and pricing modifiers.</p>
+  </div>
+  <a href="{{ url_for('admin_lens_new') }}" class="admin-btn btn-primary">+ Create Lens Type</a>
+</div>
+
+<div style="display:grid; grid-template-columns: 1fr; gap:2.5rem; margin-top:1.5rem;">
+  {% for type in lens_types %}
+  <div class="admin-card" style="padding:2rem;">
+    <!-- Lens Type Header -->
+    <div style="display:flex; justify-content:space-between; align-items:start; border-bottom:1px solid #f1f5f9; padding-bottom:1.25rem; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem;">
+      <div style="display:flex; align-items:center; gap:1.25rem;">
+        {% if type.image_url %}
+        <img src="{{ type.image_url }}" alt="{{ type.name }}" style="width:70px; height:70px; object-fit:contain; border-radius:6px; background:#f8fafc; border:1px solid #e2e8f0; padding:4px;" />
+        {% else %}
+        <div style="width:70px; height:70px; background:#f1f5f9; border-radius:6px; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-weight:600; font-size:0.85rem; border:1px dashed #cbd5e1;">No Img</div>
+        {% endif %}
+        <div>
+          <h2 style="font-size:1.2rem; font-weight:700; color:var(--admin-text-main); margin-bottom:0.25rem; display:flex; align-items:center; gap:0.5rem;">
+            {{ type.name }}
+            {% if type.is_active %}
+            <span class="admin-badge admin-badge-success" style="font-size:0.75rem;">Active</span>
+            {% else %}
+            <span class="admin-badge admin-badge-warning" style="font-size:0.75rem;">Inactive</span>
+            {% endif %}
+          </h2>
+          <p style="font-size:0.875rem; color:var(--admin-text-muted);">{{ type.description or 'No description provided.' }}</p>
+          <div style="font-size:0.75rem; color:var(--admin-text-muted); margin-top:0.25rem;">Display Order: {{ type.display_order }}</div>
+        </div>
+      </div>
+      
+      <div style="display:flex; gap:0.5rem; align-items:center;">
+        <a href="{{ url_for('admin_lens_option_new', lens_id=type.id) }}" class="admin-btn btn-primary" style="font-size:0.8125rem; padding:0.5rem 1rem;">+ Add Option</a>
+        <a href="{{ url_for('admin_lens_edit', lens_id=type.id) }}" class="admin-btn btn-outline" style="font-size:0.8125rem; padding:0.5rem 1rem;">Edit</a>
+        <form action="{{ url_for('admin_lens_delete', lens_id=type.id) }}" method="post" onsubmit="return confirm('Delete this lens type and all of its options permanently?')" style="margin:0;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+          <button type="submit" class="admin-btn" style="padding:0.5rem 1rem; font-size:0.8125rem; color:#ef4444; background:rgba(239,68,68,0.05); border:none; cursor:pointer;">Delete</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Lens Options Table -->
+    <h3 style="font-size:0.875rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:var(--admin-text-muted); margin-bottom:0.75rem;">Lenses & Price Modifiers</h3>
+    <div class="admin-table-container">
+      <table class="admin-table" style="margin-bottom:0;">
+        <thead>
+          <tr>
+            <th>Option Name</th>
+            <th>Price Modifier</th>
+            <th>Display Order</th>
+            <th>Status</th>
+            <th style="text-align:right;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for opt in type.options %}
+          <tr>
+            <td style="font-weight:600;">{{ opt.name }}</td>
+            <td style="color:#059669; font-weight:700;">+₹{{ "{:,.2f}".format(opt.price_modifier) }}</td>
+            <td>{{ opt.display_order }}</td>
+            <td>
+              {% if opt.is_active %}
+              <span class="admin-badge admin-badge-success">Active</span>
+              {% else %}
+              <span class="admin-badge admin-badge-warning">Inactive</span>
+              {% endif %}
+            </td>
+            <td style="text-align:right; display:flex; justify-content:flex-end; gap:0.5rem; align-items:center;">
+              <a href="{{ url_for('admin_lens_option_edit', option_id=opt.id) }}" class="admin-btn btn-outline" style="padding:0.25rem 0.5rem; font-size:0.75rem;">Edit</a>
+              <form action="{{ url_for('admin_lens_option_delete', option_id=opt.id) }}" method="post" onsubmit="return confirm('Delete option \'{{ opt.name }}\'?')" style="margin:0;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                <button type="submit" class="admin-btn" style="padding:0.25rem 0.5rem; font-size:0.75rem; color:#ef4444; background:none; border:none; cursor:pointer;">Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="5" style="text-align:center; padding:1.5rem; color:var(--admin-text-muted); font-size:0.875rem;">No options configured for this lens type. Click "+ Add Option" above to create one.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <div class="admin-card" style="padding:4rem; text-align:center; color:var(--admin-text-muted);">
+    <p style="margin-bottom:1.5rem; font-size:1.1rem;">No lens types configured yet.</p>
+    <a href="{{ url_for('admin_lens_new') }}" class="admin-btn btn-primary">+ Create First Lens Type</a>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

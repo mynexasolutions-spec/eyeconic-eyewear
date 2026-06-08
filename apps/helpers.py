@@ -86,6 +86,17 @@ def refresh_cart_prices(cart):
         if not product:
             continue
         price    = float(product.get("sale_price") or product.get("price") or 0)
+        
+        # Look up lens option price modifier if present
+        lens_option_id = item.get("lens_option_id")
+        if lens_option_id:
+            try:
+                lens_opt = db.query_one("SELECT price_modifier FROM lens_options WHERE id = ?", [lens_option_id])
+                if lens_opt:
+                    price += float(lens_opt["price_modifier"] or 0.0)
+            except Exception:
+                pass
+
         new_item = dict(item)
         new_item["price"] = price
         if not new_item.get("sku"):

@@ -297,6 +297,11 @@
               style="width:18px; height:18px; accent-color:var(--admin-primary);" />
             <span style="font-weight:600; font-size:0.9rem;">Featured Product</span>
           </label>
+          <label style="display:flex; align-items:center; gap:0.6rem; cursor:pointer;">
+            <input type="checkbox" name="is_lens_compatible" {% if product and product.is_lens_compatible %}checked{% endif %}
+              style="width:18px; height:18px; accent-color:var(--admin-primary);" />
+            <span style="font-weight:600; font-size:0.9rem;">Supports Lens Customization</span>
+          </label>
         </div>
       </div>
 

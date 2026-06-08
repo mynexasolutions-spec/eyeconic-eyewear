@@ -17,7 +17,7 @@ PRODUCTS_SELECT = """
             p.price
         ) AS price,
         p.sale_price, p.stock_quantity, p.stock_status,
-        p.is_featured, p.is_active, p.created_at,
+        p.is_featured, p.is_active, p.created_at, p.is_lens_compatible,
         c.name  AS category_name, c.slug AS category_slug,
         b.name  AS brand_name,    b.slug AS brand_slug,
         m.file_url AS image_url

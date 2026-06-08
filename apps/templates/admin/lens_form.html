@@ -1,0 +1,60 @@
+{% extends "admin/base.html" %}
+{% block title %}{{ 'Edit Lens Type' if lens_type else 'New Lens Type' }} – StoreAdmin{% endblock %}
+
+{% block content %}
+<div style="margin-bottom:2rem;">
+  <div style="display:flex; align-items:center; gap:0.5rem; color:var(--admin-text-muted); font-size:0.875rem; margin-bottom:1rem;">
+    <a href="{{ url_for('admin_lenses') }}" style="color:var(--admin-primary);">Lenses</a>
+    <span>/</span>
+    <span>{{ 'Edit' if lens_type else 'New' }}</span>
+  </div>
+  <h1 style="font-size:1.5rem; font-weight:700; color:var(--admin-text-main); margin:0;">{{ 'Edit Lens Type' if lens_type else 'Create New Lens Type' }}</h1>
+</div>
+
+<form method="post" action="{% if lens_type %}{{ url_for('admin_lens_edit', lens_id=lens_type.id) }}{% else %}{{ url_for('admin_lens_new') }}{% endif %}" class="admin-card" style="padding:2.5rem; max-width:700px;" enctype="multipart/form-data">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:2rem; margin-bottom:1.5rem;">
+    <div>
+      <label class="admin-label">Lens Type Name *</label>
+      <input type="text" name="name" value="{{ lens_type.name if lens_type else '' }}" placeholder="e.g. Single Vision, Progressive" required class="admin-input" style="background:#fff;" />
+    </div>
+    <div>
+      <label class="admin-label">Display Order</label>
+      <input type="number" name="display_order" value="{{ lens_type.display_order if lens_type else '0' }}" class="admin-input" style="background:#fff;" />
+    </div>
+  </div>
+
+  <div style="margin-bottom:1.5rem;">
+    <label class="admin-label">Description (Optional)</label>
+    <textarea name="description" class="admin-input" rows="3" placeholder="Briefly describe what this lens type is for..." style="background:#fff;">{{ lens_type.description if lens_type else '' }}</textarea>
+  </div>
+
+  <div style="margin-bottom:2rem;">
+    <label class="admin-label">Lens Type Image / Icon</label>
+    <div style="display:flex; gap:1.5rem; align-items:start; background:#f9fafb; padding:1.25rem; border-radius:0.75rem; border:1px solid var(--admin-border);">
+        {% if lens_type and lens_type.image_url %}
+        <div style="width:100px; height:100px; border-radius:8px; overflow:hidden; border:1px solid var(--admin-border); background:white; padding: 6px;">
+            <img src="{{ lens_type.image_url }}" style="width:100%; height:100%; object-fit:contain;" />
+        </div>
+        {% endif %}
+        <div style="flex:1;">
+            <label style="display:block; font-size:0.75rem; font-weight:700; color:var(--admin-text-muted); text-transform:uppercase; margin-bottom:0.5rem;">Upload Card Image</label>
+            <input type="file" name="image_file" class="admin-input" accept="image/*" style="padding:0.5rem; background:white;" />
+        </div>
+    </div>
+  </div>
+
+  <div style="margin-bottom:2rem;">
+    <label style="display:flex; align-items:center; gap:0.6rem; cursor:pointer;">
+      <input type="checkbox" name="is_active" {% if not lens_type or lens_type.is_active %}checked{% endif %} style="width:18px; height:18px; accent-color:var(--admin-primary);" />
+      <span style="font-weight:600; font-size:0.9rem;">Status Active (Visible on storefront)</span>
+    </label>
+  </div>
+
+  <div style="display:flex; gap:1rem; padding-top:1.5rem; border-top:1px solid var(--admin-border);">
+    <button type="submit" class="admin-btn btn-primary" style="padding:0.75rem 2rem; font-weight:700;">Save Lens Type</button>
+    <a href="{{ url_for('admin_lenses') }}" class="admin-btn btn-outline" style="padding:0.75rem 2rem;">Cancel</a>
+  </div>
+</form>
+{% endblock %}
