@@ -39,7 +39,7 @@
   <div class="account-header" style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:3rem; border-bottom:1px solid var(--light-gray); padding-bottom:1.5rem;">
     <div>
       <h1 style="font-family:var(--font-display); font-size:2.4rem; color:var(--charcoal);">My Account</h1>
-      <p style="color:var(--mid-gray); margin-top:0.5rem;">Hello, {{ current_user.first_name }}! Welcome back.</p>
+      <p style="color:var(--mid-gray); margin-top:0.5rem;">Hello, {{ user.first_name }}! Welcome back.</p>
     </div>
     <a href="{{ url_for('auth.logout') }}" style="color:#ef4444; font-size:0.75rem; letter-spacing:0.1em; text-transform:uppercase; font-weight:700; text-decoration:none;">Sign Out</a>
   </div>
@@ -89,11 +89,11 @@
         <h4 style="font-family:var(--font-display); font-size:1.1rem; margin-bottom:1.25rem;">Account Details</h4>
         <div style="margin-bottom:1.5rem;">
           <p style="font-size:0.65rem; letter-spacing:0.1em; text-transform:uppercase; color:var(--mid-gray); margin-bottom:4px;">Full Name</p>
-          <p style="font-size:0.9rem; font-weight:600;">{{ current_user.first_name }} {{ current_user.last_name }}</p>
+          <p style="font-size:0.9rem; font-weight:600;">{{ user.first_name }} {{ user.last_name }}</p>
         </div>
         <div style="margin-bottom:1.5rem;">
           <p style="font-size:0.65rem; letter-spacing:0.1em; text-transform:uppercase; color:var(--mid-gray); margin-bottom:4px;">Email Address</p>
-          <p style="font-size:0.9rem; font-weight:600;">{{ current_user.email }}</p>
+          <p style="font-size:0.9rem; font-weight:600;">{{ user.email }}</p>
         </div>
         <a href="#" style="display:block; padding:12px; background:var(--cream); text-align:center; color:var(--charcoal); font-size:0.75rem; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; text-decoration:none; margin-top:2rem;">Edit Profile</a>
       </div>

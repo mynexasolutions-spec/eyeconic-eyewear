@@ -1,6 +1,7 @@
 import re
 import functools
 import time
+import threading
 import markupsafe
 import cloudinary
 import cloudinary.uploader
@@ -16,19 +17,25 @@ def slugify(text):
 def ttl_cache(ttl_seconds=60):
     def decorator(func):
         cache = {}
+        lock  = threading.Lock()
 
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             key = (args, tuple(sorted(kwargs.items())))
             now = time.time()
-            cached = cache.get(key)
-            if cached and now - cached[0] < ttl_seconds:
-                return cached[1]
+            with lock:
+                cached = cache.get(key)
+                if cached and now - cached[0] < ttl_seconds:
+                    return cached[1]
             result = func(*args, **kwargs)
-            cache[key] = (now, result)
+            with lock:
+                cache[key] = (now, result)
             return result
 
-        wrapper.cache_clear = cache.clear
+        def _cache_clear():
+            with lock:
+                cache.clear()
+        wrapper.cache_clear = _cache_clear
         return wrapper
     return decorator
 
@@ -36,7 +43,8 @@ def ttl_cache(ttl_seconds=60):
 def get_unique_slug(table, base_slug, exclude_id=None):
     slug = base_slug or "item"
     counter = 1
-    while True:
+    max_attempts = 50  # Safety cap to prevent infinite loop
+    while counter <= max_attempts:
         query = f"SELECT id FROM {table} WHERE slug = ?"
         params = [slug]
         if exclude_id:
@@ -46,6 +54,9 @@ def get_unique_slug(table, base_slug, exclude_id=None):
             return slug
         slug = f"{base_slug}-{counter}"
         counter += 1
+    # Fallback: append a UUID fragment to guarantee uniqueness
+    import uuid
+    return f"{base_slug}-{uuid.uuid4().hex[:8]}"
 
 
 def get_store_settings():

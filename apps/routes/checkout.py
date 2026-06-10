@@ -304,50 +304,57 @@ def checkout():
         try:
             order_id     = str(uuid.uuid4())
             order_number = f"ORD-{uuid.uuid4().hex[:12].upper()}"
-            db.execute(
-                """INSERT INTO orders
-                   (id, order_number, user_id, subtotal, shipping_amount, total_amount, status,
-                    payment_method, payment_status, shipping_address_json, customer_name,
-                    customer_email, customer_phone, notes, coupon_code, discount_amount)
-                   VALUES (?,?,?,?,?,?,'pending',?,?,?,?,?,?,?,?,?)""",
-                [order_id, order_number, uid, subtotal, shipping, total,
-                 payment_method, payment_status, json.dumps(shipping_addr),
-                 customer_name, customer_email, addr_phone, notes,
-                 coupon_code or "", discount_amount],
-            )
 
-            for item_key, item in cart.items():
-                unit_price = float(item.get("price", 0))
-                qty        = int(item.get("qty", 1))
-                pid        = item.get("product_id")
-                vid        = item.get("variation_id")
-
-                db.execute(
-                    "UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?", [qty, pid]
+            with db.transaction() as tx:
+                tx.execute(
+                    """INSERT INTO orders
+                       (id, order_number, user_id, subtotal, shipping_amount, total_amount, status,
+                        payment_method, payment_status, shipping_address_json, customer_name,
+                        customer_email, customer_phone, notes, coupon_code, discount_amount)
+                       VALUES (?,?,?,?,?,?,'pending',?,?,?,?,?,?,?,?,?)""",
+                    [order_id, order_number, uid, subtotal, shipping, total,
+                     payment_method, payment_status, json.dumps(shipping_addr),
+                     customer_name, customer_email, addr_phone, notes,
+                     coupon_code or "", discount_amount],
                 )
-                p_row = db.query_one("SELECT stock_quantity FROM products WHERE id = ?", [pid])
-                if p_row and p_row["stock_quantity"] <= 0:
-                    db.execute(
-                        "UPDATE products SET stock_quantity = 0, stock_status = 'out_of_stock' WHERE id = ?", [pid]
+
+                for item_key, item in cart.items():
+                    unit_price = float(item.get("price", 0))
+                    qty        = int(item.get("qty", 1))
+                    pid        = item.get("product_id")
+                    vid        = item.get("variation_id")
+
+                    # Only track stock if product has manage_stock enabled
+                    p_row = tx.query_one("SELECT stock_quantity, manage_stock FROM products WHERE id = ?", [pid])
+                    if p_row and p_row.get("manage_stock"):
+                        tx.execute(
+                            "UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?", [qty, pid]
+                        )
+                        # Re-fetch after decrement to check if now out of stock
+                        updated = tx.query_one("SELECT stock_quantity FROM products WHERE id = ?", [pid])
+                        if updated and updated["stock_quantity"] <= 0:
+                            tx.execute(
+                                "UPDATE products SET stock_quantity = 0, stock_status = 'out_of_stock' WHERE id = ?", [pid]
+                            )
+
+                    pres_url = item.get("prescription_url", "")
+                    tx.execute(
+                        """INSERT INTO order_items
+                           (id, order_id, product_id, variation_id, quantity,
+                            unit_price, total_price, product_name_snapshot, prescription_url)
+                           VALUES (?,?,?,?,?,?,?,?,?)""",
+                        [str(uuid.uuid4()), order_id, pid, vid or None, qty,
+                         unit_price, unit_price * qty, item.get("name", ""), pres_url],
                     )
 
-                pres_url = item.get("prescription_url", "")
-                db.execute(
-                    """INSERT INTO order_items
-                       (id, order_id, product_id, variation_id, quantity,
-                        unit_price, total_price, product_name_snapshot, prescription_url)
-                       VALUES (?,?,?,?,?,?,?,?,?)""",
-                    [str(uuid.uuid4()), order_id, pid, vid or None, qty,
-                     unit_price, unit_price * qty, item.get("name", ""), pres_url],
-                )
+                # Record coupon usage
+                if coupon:
+                    tx.execute(
+                        "INSERT INTO coupon_usages (id, coupon_id, user_id, order_id) VALUES (?,?,?,?)",
+                        [str(uuid.uuid4()), coupon["id"], uid, order_id],
+                    )
 
-            # Record coupon usage
-            if coupon:
-                db.execute(
-                    "INSERT INTO coupon_usages (id, coupon_id, user_id, order_id) VALUES (?,?,?,?)",
-                    [str(uuid.uuid4()), coupon["id"], uid, order_id],
-                )
-
+            # Save address separately (not critical — failure shouldn't roll back the order)
             if save_address:
                 try:
                     is_default = len(addresses) == 0
@@ -425,10 +432,17 @@ def order_detail(order_id):
         if not order:
             abort(404)
         items = db.query("SELECT * FROM order_items WHERE order_id=?", [order_id])
+        shipping_address = {}
+        if order.get("shipping_address_json"):
+            try:
+                import json
+                shipping_address = json.loads(order["shipping_address_json"])
+            except Exception:
+                pass
     except Exception as e:
         flash(f"Error fetching order: {e}", "error")
         return redirect(url_for("auth.account"))
-    return render_template("order_detail.html", order=order, items=items)
+    return render_template("order_detail.html", order=order, items=items, shipping_address=shipping_address)
 
 
 @bp.route("/order/<order_id>/cancel", methods=["POST"])
@@ -466,10 +480,12 @@ def order_cancel(order_id):
             if pid and qty > 0:
                 stock_changes[pid] = stock_changes.get(pid, 0) + qty
         for pid, qty in stock_changes.items():
-            db.execute(
-                "UPDATE products SET stock_quantity = stock_quantity + ?, stock_status = 'in_stock' WHERE id = ?",
-                [qty, pid],
-            )
+            p_row = db.query_one("SELECT manage_stock FROM products WHERE id = ?", [pid])
+            if p_row and p_row.get("manage_stock"):
+                db.execute(
+                    "UPDATE products SET stock_quantity = stock_quantity + ?, stock_status = 'in_stock' WHERE id = ?",
+                    [qty, pid],
+                )
         db.execute(
             "UPDATE orders SET status='cancelled', payment_status='cancelled', cancelled_at=NOW(), cancel_reason=? WHERE id=? AND user_id=?",
             [cancel_reason, order_id, uid],
@@ -504,7 +520,7 @@ def submit_review(product_id):
             flash("You have already submitted a review for this product.", "info")
             return redirect(url_for("public.product_detail", product_id=product_id))
         db.execute(
-            "INSERT INTO product_reviews (product_id, user_id, rating, body, is_approved) VALUES (?,?,?,?,1)",
+            "INSERT INTO product_reviews (product_id, user_id, rating, body, is_approved) VALUES (?,?,?,?,0)",
             [product_id, uid, rating, comment],
         )
         try:
@@ -512,7 +528,7 @@ def submit_review(product_id):
             get_product_detail.cache_clear()
         except Exception:
             pass
-        flash("Thank you! Your review has been submitted.", "success")
+        flash("Thank you! Your review has been submitted and is pending approval.", "success")
     except Exception as e:
         flash(f"Error submitting review: {e}", "error")
     return redirect(url_for("public.product_detail", product_id=product_id))

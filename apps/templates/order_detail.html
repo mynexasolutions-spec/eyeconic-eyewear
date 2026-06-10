@@ -35,6 +35,73 @@
                 </div>
                 {% endif %}
 
+        {# ── Order Status Tracker ── #}
+        {% if order.status not in ['cancelled', 'refunded'] %}
+        {% set steps = [
+            ('pending',    'Order Placed',   '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>'),
+            ('processing', 'Processing',     '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>'),
+            ('shipped',    'Shipped',        '<path d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l2.293.293M13 16H9m4 0h2m0 0l1.293-.293A1 1 0 0017 15V9.5L14.5 7H13m4 9h2a1 1 0 001-1v-1"/>'),
+            ('delivered',  'Delivered',      '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>')
+        ] %}
+        {% set status_order = ['pending', 'processing', 'shipped', 'delivered'] %}
+        {% set current_idx = status_order.index(order.status) if order.status in status_order else 0 %}
+
+        <div class="glass" style="border-radius:1.5rem; padding:2rem 2.5rem; margin-bottom:2rem;">
+            <div style="display:flex; align-items:center; justify-content:space-between; position:relative;">
+                {# Connector line behind steps #}
+                <div style="position:absolute; top:28px; left:calc(12.5% - 1px); right:calc(12.5% - 1px); height:3px; background:var(--border-glass); border-radius:999px; z-index:0;"></div>
+                {# Active portion of connector line #}
+                <div style="position:absolute; top:28px; left:calc(12.5% - 1px); width:calc({{ (current_idx / 3 * 75) | int }}%); height:3px; background:linear-gradient(90deg, var(--primary), #a78bfa); border-radius:999px; z-index:1; transition:width 0.6s ease;"></div>
+
+                {% for step_key, step_label, step_icon in steps %}
+                {% set step_idx = loop.index0 %}
+                {% set is_done = step_idx < current_idx %}
+                {% set is_active = step_idx == current_idx %}
+                <div style="display:flex; flex-direction:column; align-items:center; gap:0.6rem; flex:1; position:relative; z-index:2;">
+                    <div style="
+                        width:56px; height:56px; border-radius:999px;
+                        display:flex; align-items:center; justify-content:center;
+                        transition: all 0.4s ease;
+                        {% if is_done %}
+                            background: linear-gradient(135deg, var(--primary), #a78bfa);
+                            box-shadow: 0 0 0 4px rgba(124,58,237,0.15);
+                        {% elif is_active %}
+                            background: linear-gradient(135deg, var(--primary), #a78bfa);
+                            box-shadow: 0 0 0 6px rgba(124,58,237,0.2), 0 0 20px rgba(124,58,237,0.3);
+                            animation: pulse-ring 2s infinite;
+                        {% else %}
+                            background: var(--border-glass);
+                            opacity: 0.5;
+                        {% endif %}
+                    ">
+                        {% if is_done %}
+                        {# Checkmark for completed steps #}
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        {% else %}
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="{{ 'white' if is_active else 'var(--text-muted)' }}" stroke-width="1.8">
+                            {{ step_icon | safe }}
+                        </svg>
+                        {% endif %}
+                    </div>
+                    <span style="font-size:0.75rem; font-weight:{{ '700' if is_active or is_done else '500' }}; color:{{ 'var(--text-main)' if is_active or is_done else 'var(--text-muted)' }}; text-align:center; white-space:nowrap;">
+                        {{ step_label }}
+                    </span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <style>
+        @keyframes pulse-ring {
+            0%   { box-shadow: 0 0 0 6px rgba(124,58,237,0.2), 0 0 20px rgba(124,58,237,0.3); }
+            50%  { box-shadow: 0 0 0 10px rgba(124,58,237,0.05), 0 0 28px rgba(124,58,237,0.2); }
+            100% { box-shadow: 0 0 0 6px rgba(124,58,237,0.2), 0 0 20px rgba(124,58,237,0.3); }
+        }
+        </style>
+
         <div style="display: grid; grid-template-columns: 1fr 320px; gap: 2.5rem; align-items: start;">
             
             <!-- Items Section -->
@@ -94,8 +161,12 @@
                 <div class="glass" style="border-radius: 1.5rem; padding: 2rem;">
                     <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 1.25rem; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em;">Shipping Details</h4>
                     <p style="font-weight: 600; color: var(--text-main); margin-bottom: 0.75rem;">{{ order.customer_name }}</p>
-                    <p style="color: var(--text-muted); font-size: 0.95rem; line-height: 1.6;">
-                        {{ order.shipping_address }}<br>
+                    <p style="color: var(--text-muted); font-size: 0.95rem; line-height: 1.8;">
+                        {% if shipping_address %}
+                            {{ shipping_address.get('address_line1', '') }}{% if shipping_address.get('address_line2') %}, {{ shipping_address.get('address_line2') }}{% endif %}<br>
+                            {{ shipping_address.get('city', '') }}{% if shipping_address.get('state') %}, {{ shipping_address.get('state') }}{% endif %} – {{ shipping_address.get('pincode', '') }}<br>
+                            {{ shipping_address.get('country', 'India') }}<br>
+                        {% endif %}
                         Phone: {{ order.customer_phone }}
                     </p>
                 </div>

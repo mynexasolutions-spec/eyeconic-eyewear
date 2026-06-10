@@ -2,7 +2,6 @@ import csv
 import io
 import uuid
 import itertools
-import uuid
 from functools import wraps
 from flask import render_template, request, redirect, url_for, flash, abort, session
 import db
@@ -159,7 +158,10 @@ def register(app):
         search   = request.args.get("search", "").strip()
         category = request.args.get("category", "").strip()
         brand    = request.args.get("brand", "").strip()
-        page     = max(1, int(request.args.get("page", 1)))
+        try:
+            page = max(1, int(request.args.get("page", 1)))
+        except (ValueError, TypeError):
+            page = 1
         try:
             products, total, total_pages = get_products(
                 search=search, category=category, brand=brand, page=page, per_page=20
@@ -191,9 +193,12 @@ def register(app):
         if request.method == "POST":
             f = request.form
             try:
+                name = (f.get("name") or "").strip()
+                if not name:
+                    flash("Product name is required.", "error")
+                    return render_template("admin/product_form.html", product=None, categories=categories, brands=brands, all_attributes=all_attributes, action="new")
                 stock_qty = int(f.get("stock_quantity") or 0)
                 stock_status = f.get("stock_status", "in_stock")
-                name = f.get("name")
                 slug = get_unique_slug("products", f.get("slug") or slugify(name))
                 sku_input = f.get("sku", "").strip()
                 sku = sku_input or generate_unique_product_sku(name)
@@ -208,10 +213,10 @@ def register(app):
                         str(uuid.uuid4()), name, slug, sku,
                         f.get("type", "simple"), f.get("description"), f.get("short_description"),
                         float(f.get("price") or 0), float(f.get("sale_price") or 0) or None,
-                        stock_qty, stock_status, True,
+                        stock_qty, stock_status, 1,
                         f.get("category_id") or None, f.get("brand_id") or None,
                         1 if f.get("is_featured") == "on" else 0, 1 if f.get("is_active", "on") == "on" else 0,
-                        True if f.get("is_lens_compatible") == "on" else False,
+                        1 if f.get("is_lens_compatible") == "on" else 0,
                     ]
                 )["id"]
 
@@ -282,7 +287,10 @@ def register(app):
         if request.method == "POST":
             f = request.form
             try:
-                name = f.get("name")
+                name = (f.get("name") or "").strip()
+                if not name:
+                    flash("Product name is required.", "error")
+                    return render_template("admin/product_form.html", product=product, categories=categories, brands=brands, all_attributes=all_attributes, action="edit")
                 slug = get_unique_slug("products", f.get("slug") or slugify(name), exclude_id=product_id)
                 sku_input = (f.get("sku") or "").strip()
                 updated_sku = sku_input or product.get("sku") or generate_unique_product_sku(name)
@@ -296,7 +304,7 @@ def register(app):
                         int(f.get("stock_quantity") or 0), f.get("stock_status"),
                         f.get("category_id") or None, f.get("brand_id") or None,
                         1 if f.get("is_featured") == "on" else 0, 1 if f.get("is_active") == "on" else 0,
-                        True if f.get("is_lens_compatible") == "on" else False,
+                        1 if f.get("is_lens_compatible") == "on" else 0,
                         product_id
                     ]
                 )
@@ -389,7 +397,10 @@ def register(app):
     @require_admin
     def admin_category_new():
         if request.method == "POST":
-            name       = request.form.get("name")
+            name       = request.form.get("name", "").strip()
+            if not name:
+                flash("Category name is required.", "error")
+                return render_template("admin/category_form.html", category=None, categories=get_categories())
             slug       = request.form.get("slug") or slugify(name)
             parent_id  = request.form.get("parent_id") or None
             is_featured = 1 if request.form.get("is_featured") == "on" else 0
@@ -475,7 +486,10 @@ def register(app):
     @require_admin
     def admin_brand_new():
         if request.method == "POST":
-            name = request.form.get("name")
+            name = request.form.get("name", "").strip()
+            if not name:
+                flash("Brand name is required.", "error")
+                return render_template("admin/brand_form.html", brand=None)
             slug = request.form.get("slug") or slugify(name)
             image_url = handle_upload(request.files.get("image_file")) or None
             try:
@@ -528,7 +542,10 @@ def register(app):
     @require_admin
     def admin_orders():
         import math
-        page     = max(1, int(request.args.get("page", 1)))
+        try:
+            page = max(1, int(request.args.get("page", 1)))
+        except (ValueError, TypeError):
+            page = 1
         per_page = 20
         offset   = (page - 1) * per_page
         try:
@@ -582,7 +599,19 @@ def register(app):
             flash("Invalid status.", "error")
             return redirect(url_for("admin_order_detail", order_id=order_id))
         try:
-            db.execute("UPDATE orders SET status=? WHERE id=?", [status, order_id])
+            # Sync payment_status for terminal states
+            payment_status_map = {
+                "cancelled": "cancelled",
+                "refunded":  "refunded",
+            }
+            payment_status = payment_status_map.get(status)
+            if payment_status:
+                db.execute(
+                    "UPDATE orders SET status=?, payment_status=? WHERE id=?",
+                    [status, payment_status, order_id]
+                )
+            else:
+                db.execute("UPDATE orders SET status=? WHERE id=?", [status, order_id])
             flash(f"Order status updated to '{status}'.", "success")
         except Exception as e:
             flash(f"Error: {e}", "error")
@@ -631,7 +660,7 @@ def register(app):
         if request.method == "POST":
             name       = request.form.get("name")
             slug       = request.form.get("slug") or slugify(name)
-            is_featured = request.form.get("is_featured") == "on"
+            is_featured = 1 if request.form.get("is_featured") == "on" else 0
             image_url = handle_upload(request.files.get("image_file")) or None
             
             if not name:
@@ -658,10 +687,10 @@ def register(app):
             image_url = handle_upload(request.files.get("image_file")) or attribute["image_url"]
             try:
                 db.execute(
-                    "UPDATE attributes SET name=%s, slug=%s, image_url=%s, is_featured=%s WHERE id=%s",
+                    "UPDATE attributes SET name=?, slug=?, image_url=?, is_featured=? WHERE id=?",
                     [request.form.get("name"), request.form.get("slug"),
                      image_url,
-                     request.form.get("is_featured") == "on", attr_id]
+                     1 if request.form.get("is_featured") == "on" else 0, attr_id]
                 )
                 flash("Attribute updated", "success")
                 return redirect(url_for("admin_attributes"))
@@ -673,6 +702,17 @@ def register(app):
     @require_admin
     def admin_attribute_delete(attr_id):
         try:
+            # Cascade: remove all references before deleting the attribute
+            db.execute(
+                "DELETE FROM product_attribute_values WHERE attribute_value_id IN "
+                "(SELECT id FROM attribute_values WHERE attribute_id = ?)", [attr_id]
+            )
+            db.execute(
+                "DELETE FROM variation_attribute_values WHERE attribute_value_id IN "
+                "(SELECT id FROM attribute_values WHERE attribute_id = ?)", [attr_id]
+            )
+            db.execute("DELETE FROM attribute_values WHERE attribute_id = ?", [attr_id])
+            db.execute("DELETE FROM product_attributes WHERE attribute_id = ?", [attr_id])
             db.execute("DELETE FROM attributes WHERE id = ?", [attr_id])
             flash("Attribute deleted", "success")
         except Exception as e:
@@ -830,6 +870,8 @@ def register(app):
     def admin_variation_delete(var_id):
         product_id = request.form.get("product_id")
         try:
+            # Cascade: remove attribute value links first to avoid orphaned rows
+            db.execute("DELETE FROM variation_attribute_values WHERE variation_id = ?", [var_id])
             db.execute("DELETE FROM product_variations WHERE id = ?", [var_id])
             flash("Variation deleted", "success")
         except Exception as e:
@@ -1120,11 +1162,15 @@ def register(app):
     @app.route("/admin/coupons")
     @require_admin
     def admin_coupons():
-        coupons = db.query("""
-            SELECT c.*, (SELECT COUNT(*) FROM coupon_usages WHERE coupon_id = c.id) as used_count
-            FROM coupons c 
-            ORDER BY c.created_at DESC
-        """)
+        try:
+            coupons = db.query("""
+                SELECT c.*, (SELECT COUNT(*) FROM coupon_usages WHERE coupon_id = c.id) as used_count
+                FROM coupons c 
+                ORDER BY c.created_at DESC
+            """)
+        except Exception as e:
+            coupons = []
+            flash(f"Error loading coupons: {e}", "error")
         return render_template("admin/coupons.html", coupons=coupons)
 
     @app.route("/admin/coupons/new", methods=["GET", "POST"])
@@ -1145,7 +1191,7 @@ def register(app):
                         int(f.get("usage_limit_per_user") or 1),
                         float(f.get("max_discount")) if f.get("max_discount") else None,
                         f.get("expires_at") or None,
-                        f.get("is_active") == "on"
+                        1 if f.get("is_active") == "on" else 0
                     ]
                 )
                 flash("Coupon created successfully.", "success")
@@ -1158,6 +1204,8 @@ def register(app):
     @require_admin
     def admin_coupon_delete(coupon_id):
         try:
+            # Remove usage records first to avoid orphaned rows
+            db.execute("DELETE FROM coupon_usages WHERE coupon_id=?", [coupon_id])
             db.execute("DELETE FROM coupons WHERE id=?", [coupon_id])
             flash("Coupon deleted successfully.", "success")
         except Exception as e:

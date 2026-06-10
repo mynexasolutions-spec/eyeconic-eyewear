@@ -111,6 +111,43 @@ def execute_returning(sql, params=None):
         pool.putconn(conn)
 
 
+from contextlib import contextmanager
+
+@contextmanager
+def transaction():
+    """
+    Context manager for atomic multi-step DB operations.
+
+    Usage:
+        with db.transaction() as tx:
+            tx.execute(sql1, params1)
+            tx.execute(sql2, params2)
+        # All committed together on exit, or all rolled back on exception.
+    """
+    pool = _get_pool()
+    conn = pool.getconn()
+    try:
+        class Tx:
+            def execute(self, sql, params=None):
+                cur = conn.cursor()
+                cur.execute(_adapt(sql), params or ())
+                return cur.rowcount
+
+            def query_one(self, sql, params=None):
+                cur = conn.cursor()
+                cur.execute(_adapt(sql), params or ())
+                row = cur.fetchone()
+                return dict(row) if row else None
+
+        yield Tx()
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        pool.putconn(conn)
+
+
 def migrate():
     """No-op — schema is managed by migrate_to_pg.py."""
     pass

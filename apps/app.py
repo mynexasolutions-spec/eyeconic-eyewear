@@ -92,33 +92,6 @@ def create_app():
     def not_found(e):
         return render_template("errors/404.html"), 404
 
-    @app.route('/debug-static')
-    def debug_static():
-        import os
-        return {
-            "static_folder": app.static_folder,
-            "root_path": app.root_path,
-            "cwd": os.getcwd(),
-            "static_exists": os.path.exists(app.static_folder) if app.static_folder else False,
-            "logo_exists": os.path.exists(os.path.join(app.static_folder, "images/logo.jpg")) if app.static_folder and os.path.exists(app.static_folder) else False,
-            "files_in_static": os.listdir(app.static_folder) if app.static_folder and os.path.exists(app.static_folder) else []
-        }
-
-    @app.route('/debug-reviews')
-    def debug_reviews():
-        import inspect
-        import queries
-        try:
-            source = inspect.getsource(queries.get_product_detail)
-            product, images, variations, reviews, attributes = queries.get_product_detail("3ec11ff6-cb24-408f-b4af-3160c9606a0d")
-            return {
-                "source": source,
-                "num_reviews": len(reviews),
-                "reviews": [{k: str(v) for k, v in r.items()} for r in reviews] if reviews else []
-            }
-        except Exception as e:
-            return {"error": str(e)}
-
     return app
 
 

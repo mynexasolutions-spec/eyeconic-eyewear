@@ -53,7 +53,10 @@ def shop():
     selected_brands = tuple(s for s in request.args.getlist("brand")    if s)
     sort            = request.args.get("sort", "created_at_desc")
     shape           = request.args.get("shape", "").strip()
-    page            = max(1, int(request.args.get("page", 1)))
+    try:
+        page = max(1, int(request.args.get("page", 1)))
+    except (ValueError, TypeError):
+        page = 1
     on_sale         = bool(request.args.get("on_sale", ""))
     featured        = bool(request.args.get("featured", ""))
     min_price       = request.args.get("min_price", "").strip()

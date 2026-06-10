@@ -41,7 +41,8 @@ def login():
         }
         flash(f"Welcome back, {full_name}!", "success")
         next_url = request.args.get("next") or request.form.get("next")
-        if next_url:
+        # Security: only allow relative redirects to prevent open redirect attacks
+        if next_url and next_url.startswith("/") and not next_url.startswith("//"):
             return redirect(next_url)
         if user.get("role") in ("admin", "manager"):
             try:
@@ -179,11 +180,14 @@ def account():
 def account_address_delete(addr_id):
     if "user" not in session:
         return redirect(url_for("auth.login"))
-    db.execute(
-        "DELETE FROM user_addresses WHERE id=? AND user_id=?",
-        [addr_id, session["user"]["id"]]
-    )
-    flash("Address removed.", "success")
+    try:
+        db.execute(
+            "DELETE FROM user_addresses WHERE id=? AND user_id=?",
+            [addr_id, session["user"]["id"]]
+        )
+        flash("Address removed.", "success")
+    except Exception as e:
+        flash(f"Error removing address: {e}", "error")
     return redirect(url_for("auth.account"))
 
 
@@ -192,7 +196,10 @@ def account_address_default(addr_id):
     if "user" not in session:
         return redirect(url_for("auth.login"))
     uid = session["user"]["id"]
-    db.execute("UPDATE user_addresses SET is_default=FALSE WHERE user_id=?", [uid])
-    db.execute("UPDATE user_addresses SET is_default=TRUE WHERE id=? AND user_id=?", [addr_id, uid])
-    flash("Default address updated.", "success")
+    try:
+        db.execute("UPDATE user_addresses SET is_default=FALSE WHERE user_id=?", [uid])
+        db.execute("UPDATE user_addresses SET is_default=TRUE WHERE id=? AND user_id=?", [addr_id, uid])
+        flash("Default address updated.", "success")
+    except Exception as e:
+        flash(f"Error updating default address: {e}", "error")
     return redirect(url_for("auth.account"))

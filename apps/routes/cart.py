@@ -26,7 +26,10 @@ def cart_add():
     product_id       = str(request.form.get("product_id", "")).strip()
     variation_id     = str(request.form.get("variation_id", "")).strip()
     selected_options = str(request.form.get("selected_options", "")).strip()
-    qty              = max(1, int(request.form.get("qty", 1)))
+    try:
+        qty = max(1, int(request.form.get("qty", 1)))
+    except (ValueError, TypeError):
+        qty = 1
 
     if not product_id:
         flash("Invalid product.", "error")
