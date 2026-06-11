@@ -1009,6 +1009,7 @@ def register(app):
             name = request.form.get("name")
             price = float(request.form.get("price_modifier") or 0.00)
             order = int(request.form.get("display_order") or 0)
+            description = request.form.get("description", "").strip()
             is_active = 1 if request.form.get("is_active", "on") == "on" else 0
             
             if not name:
@@ -1016,9 +1017,9 @@ def register(app):
             else:
                 try:
                     db.execute(
-                        """INSERT INTO lens_options (id, lens_type_id, name, price_modifier, display_order, is_active) 
-                           VALUES (?,?,?,?,?,?)""",
-                        [str(uuid.uuid4()), lens_id, name, price, order, is_active]
+                        """INSERT INTO lens_options (id, lens_type_id, name, price_modifier, display_order, is_active, description) 
+                           VALUES (?,?,?,?,?,?,?)""",
+                        [str(uuid.uuid4()), lens_id, name, price, order, is_active, description]
                     )
                     flash("Lens option created.", "success")
                     return redirect(url_for("admin_lenses"))
@@ -1038,6 +1039,7 @@ def register(app):
             name = request.form.get("name")
             price = float(request.form.get("price_modifier") or 0.00)
             order = int(request.form.get("display_order") or 0)
+            description = request.form.get("description", "").strip()
             is_active = 1 if request.form.get("is_active") == "on" else 0
             
             if not name:
@@ -1045,9 +1047,9 @@ def register(app):
             else:
                 try:
                     db.execute(
-                        """UPDATE lens_options SET name=?, price_modifier=?, display_order=?, is_active=? 
+                        """UPDATE lens_options SET name=?, price_modifier=?, display_order=?, is_active=?, description=? 
                            WHERE id=?""",
-                        [name, price, order, is_active, option_id]
+                        [name, price, order, is_active, description, option_id]
                     )
                     flash("Lens option updated.", "success")
                     return redirect(url_for("admin_lenses"))

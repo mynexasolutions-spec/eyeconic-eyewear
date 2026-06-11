@@ -36,6 +36,14 @@
   </div>
 
   <div style="margin-bottom:2rem;">
+    <label class="admin-label">Description / Features</label>
+    <small style="color:var(--admin-text-muted); display:block; margin-bottom:0.5rem;">
+      Each line starting with <strong>-</strong> becomes a bullet point. Lines starting with "Power Allowed:", "Spherical", "Cylinder", "Axis", "Addition" are shown as power specs. All other lines are shown as headings.
+    </small>
+    <textarea name="description" rows="12" class="admin-input" style="background:#fff; font-family:monospace; font-size:0.85rem; resize:vertical;" placeholder="Blue Cut 1.60 Essential - Single Vision&#10;- Blue light block&#10;- Double side anti-glare&#10;- Crack, smudge &amp; scratch resistant&#10;- Water &amp; dust repellent&#10;- UV-420 protection&#10;Power Allowed:&#10;Spherical Power: 0 to -6 &amp; 0 to +4&#10;Cylinder Allowed: 0 to -2 &amp; 0 to +2">{{ option.description if option else '' }}</textarea>
+  </div>
+
+  <div style="margin-bottom:2rem;">
     <label style="display:flex; align-items:center; gap:0.6rem; cursor:pointer;">
       <input type="checkbox" name="is_active" {% if not option or option.is_active %}checked{% endif %} style="width:18px; height:18px; accent-color:var(--admin-primary);" />
       <span style="font-weight:600; font-size:0.9rem;">Status Active (Visible to customer)</span>

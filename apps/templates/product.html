@@ -257,6 +257,10 @@
       from { opacity: 0; transform: translateY(-10px); }
       to { opacity: 1; transform: translateY(0); }
     }
+    @keyframes lensDetailIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
 
 
     /* ADD TO CART */
@@ -695,13 +699,26 @@
               <div style="display: flex; flex-direction: column; gap: 0.6rem;">
                 {% for opt in lt.options %}
                 <label class="lens-option-row" id="optionRow_{{ opt.id }}">
-                  <input type="radio" name="lens_option_radio" value="{{ opt.id }}" data-price="{{ opt.price_modifier }}" data-label="{{ lt.name }} - {{ opt.name }}" onclick="selectLensOption('{{ opt.id }}', {{ opt.price_modifier }}, '{{ lt.name }} - {{ opt.name }}')" style="accent-color: var(--gold); width: 16px; height: 16px;" />
+                  <input type="radio" name="lens_option_radio" value="{{ opt.id }}"
+                    data-price="{{ opt.price_modifier }}"
+                    data-label="{{ lt.name }} - {{ opt.name }}"
+                    data-description="{{ opt.description | default('') | replace('"', '&quot;') | replace('\n', '\\n') }}"
+                    onclick="selectLensOption('{{ opt.id }}', {{ opt.price_modifier }}, '{{ lt.name }} - {{ opt.name }}', this.dataset.description)"
+                    style="accent-color: var(--gold); width: 16px; height: 16px;" />
                   <div style="flex: 1; margin-left: 0.5rem;">
                     <span style="font-weight: 600; font-size: 0.9rem; color: var(--charcoal);">{{ opt.name }}</span>
                   </div>
                   <span style="font-weight: 700; font-size: 0.9rem; color: var(--gold);">+₹{{ "%.0f"|format(opt.price_modifier) }}</span>
                 </label>
                 {% endfor %}
+              </div>
+
+              <!-- Lens Option Detail Panel (animated, shown when package is selected) -->
+              <div id="lensDetailPanel_{{ lt.id }}"
+                   style="display:none; margin-top:1rem; padding:1.1rem 1.3rem; background:#fff;
+                          border:1.5px solid var(--gold); border-radius:8px;
+                          animation: lensDetailIn 0.25s ease;">
+                <div id="lensDetailContent_{{ lt.id }}" style="font-size:0.87rem; color:var(--charcoal); line-height:1.7;"></div>
               </div>
 
               <!-- Prescription Upload Section (Shown if NOT Zero Power) -->
@@ -720,6 +737,7 @@
               {% endif %}
             </div>
             {% endfor %}
+
           </div>
         </div>
         {% endif %}
@@ -901,6 +919,8 @@
       }
 
       document.querySelectorAll('.lens-options-container').forEach(c => c.style.display = 'none');
+      // Also hide all detail panels when switching lens type
+      document.querySelectorAll('[id^="lensDetailPanel_"]').forEach(p => p.style.display = 'none');
       const container = document.getElementById('options-container-' + typeId);
       if (container) {
         container.style.display = 'block';
@@ -916,7 +936,7 @@
       if (container) {
         const checkedRadio = container.querySelector('input[name="lens_option_radio"]:checked');
         if (checkedRadio) {
-          selectLensOption(checkedRadio.value, parseFloat(checkedRadio.dataset.price), checkedRadio.dataset.label);
+          selectLensOption(checkedRadio.value, parseFloat(checkedRadio.dataset.price), checkedRadio.dataset.label, checkedRadio.dataset.description);
         } else {
           selectedLensOptionId = '';
           selectedLensOptionLabel = '';
@@ -929,12 +949,51 @@
       }
     }
 
-    function selectLensOption(optionId, priceModifier, label) {
+    function selectLensOption(optionId, priceModifier, label, description) {
       selectedLensOptionId = optionId;
       selectedLensOptionLabel = label;
       currentLensPrice = parseFloat(priceModifier);
       const idInput = document.getElementById('cartLensOptionId');
       if (idInput) idInput.value = optionId;
+
+      // Show the description panel for the active lens type container
+      const activeContainer = document.querySelector('.lens-options-container[style*="block"]');
+      if (activeContainer) {
+        const typeId = activeContainer.id.replace('options-container-', '');
+        const panel = document.getElementById('lensDetailPanel_' + typeId);
+        const content = document.getElementById('lensDetailContent_' + typeId);
+        if (panel && content) {
+          if (description && description.trim()) {
+            const rawText = description.replace(/\\n/g, '\n');
+            const lines = rawText.split('\n');
+            let html = '';
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (!trimmed) continue;
+              if (trimmed.startsWith('-')) {
+                // Bullet line
+                html += '<div style="display:flex;gap:0.45rem;align-items:flex-start;margin-bottom:0.15rem;">'
+                      + '<span style="color:var(--gold);font-weight:700;margin-top:0.05em;">&#8226;</span>'
+                      + '<span>' + trimmed.slice(1).trim() + '</span></div>';
+              } else if (trimmed.startsWith('Power Allowed') || trimmed.startsWith('Spherical') || trimmed.startsWith('Cylinder') || trimmed.startsWith('Axis') || trimmed.startsWith('Addition')) {
+                // Power info line
+                html += '<div style="font-size:0.82rem;color:var(--mid-gray);margin-top:0.1rem;">' + trimmed + '</div>';
+              } else {
+                // Title / heading line
+                html += '<div style="font-weight:700;font-size:0.88rem;margin-bottom:0.4rem;color:var(--charcoal);">' + trimmed + '</div>';
+              }
+            }
+            content.innerHTML = html;
+            panel.style.display = 'block';
+            // Retrigger animation
+            panel.style.animation = 'none';
+            panel.offsetHeight; // reflow
+            panel.style.animation = 'lensDetailIn 0.25s ease';
+          } else {
+            panel.style.display = 'none';
+          }
+        }
+      }
 
       recalculatePrice();
       updateAtcState();
