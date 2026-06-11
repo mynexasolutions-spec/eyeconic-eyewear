@@ -8,6 +8,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="{{ url_for('static', filename='css/chasma.css') }}" />
   <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}" />
+  <link rel="icon" href="{{ url_for('static', filename='images/favicons/favicon.ico') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='images/favicons/apple-touch-icon.png') }}">
+  <link rel="manifest" href="{{ url_for('static', filename='images/favicons/site.webmanifest') }}">
   {% block extra_css %}{% endblock %}
 </head>
 <body class="admin-body">
