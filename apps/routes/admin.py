@@ -1185,7 +1185,7 @@ def register(app):
                     """INSERT INTO coupons 
                        (id, code, type, value, min_order_amount, usage_limit, 
                         usage_limit_per_user, max_discount, expires_at, is_active)
-                       VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                       VALUES (?,?,?,?,?,?,?,?,?,CAST(? AS INTEGER))""",
                     [
                         str(uuid.uuid4()), f.get("code").upper(), f.get("type"),
                         float(f.get("value") or 0), float(f.get("min_order_amount") or 0),
