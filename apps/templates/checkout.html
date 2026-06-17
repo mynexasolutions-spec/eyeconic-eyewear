@@ -392,6 +392,7 @@
   let currentTotal    = {{ total }};
   let appliedCoupon   = '';
   let appliedDiscount = 0;
+  let selectedAddressData = null;
 
   // ── Saved address selection ───────────────────────────────────────────────
   const savedAddrFields = {
@@ -410,6 +411,7 @@
     document.querySelectorAll('.saved-addr-card').forEach(c => c.classList.remove('selected'));
     cardEl.classList.add('selected');
     document.getElementById('savedAddressId').value = addrData.id || '';
+    selectedAddressData = addrData;
     const form = document.getElementById('addressForm');
     if (form) form.style.display = 'none';
   }
@@ -418,6 +420,7 @@
     document.querySelectorAll('.saved-addr-card').forEach(c => c.classList.remove('selected'));
     document.getElementById('newAddrOption').classList.add('selected');
     document.getElementById('savedAddressId').value = '';
+    selectedAddressData = null;
     const form = document.getElementById('addressForm');
     if (form) form.style.display = 'block';
     for (const fieldId of Object.keys(savedAddrFields)) {
@@ -634,9 +637,12 @@
         description: 'Order Payment',
         order_id:    data.order.id,
         prefill: {
-          name:    (document.getElementById('addr_first_name').value + ' ' +
-                    document.getElementById('addr_last_name').value).trim(),
-          contact:  document.getElementById('addr_phone').value,
+          name:    selectedAddressData 
+                   ? ((selectedAddressData.first_name || "") + " " + (selectedAddressData.last_name || "")).trim() 
+                   : (document.getElementById('addr_first_name').value + ' ' + document.getElementById('addr_last_name').value).trim(),
+          contact:  selectedAddressData 
+                   ? (selectedAddressData.phone || "") 
+                   : document.getElementById('addr_phone').value,
         },
         theme: { color: '#6366f1' },
 
