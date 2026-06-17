@@ -730,7 +730,7 @@
                 <span class="attr-label" style="margin-bottom: 0.5rem;">3. Upload Prescription</span>
                 <p style="font-size: 0.8rem; color: var(--mid-gray); margin-bottom: 0.8rem; line-height: 1.4;">Please upload a clear image/scan of your doctor's prescription (JPEG/PNG/JPG).</p>
                 <div style="position: relative; background: #fff; border: 1.5px dashed var(--light-gray); border-radius: 4px; padding: 1rem; text-align: center; cursor: pointer; transition: border-color 0.2s;">
-                  <input type="file" name="prescription" class="prescriptionFileInput" accept="image/*" onchange="prescriptionFileSelected(this)" style="opacity: 0; position: absolute; top: 0; left: 0; width: 100%; height: 100%; cursor: pointer;" />
+                  <input type="file" name="prescription" class="prescriptionFileInput" accept="image/*" onchange="prescriptionFileSelected(this)" disabled style="opacity: 0; position: absolute; top: 0; left: 0; width: 100%; height: 100%; cursor: pointer;" />
                   <div class="uploadPlaceholder" style="color: var(--mid-gray); font-size: 0.85rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
                     <svg xmlns="http://www.w3.org/2000/svg" style="width:18px; height:18px;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
                     <span class="uploadLabelText">Choose Prescription File...</span>
@@ -907,6 +907,12 @@
         selectedLensOptionLabel = '';
         const idInput = document.getElementById('cartLensOptionId');
         if (idInput) idInput.value = '';
+        
+        // Disable all prescription file inputs
+        document.querySelectorAll('.prescriptionFileInput').forEach(input => {
+          input.disabled = true;
+        });
+        
         updateAtcState();
       }
       recalculatePrice();
@@ -921,6 +927,11 @@
         typeCard.classList.add('active');
       }
 
+      // Disable all file inputs first
+      document.querySelectorAll('.prescriptionFileInput').forEach(input => {
+        input.disabled = true;
+      });
+
       document.querySelectorAll('.lens-options-container').forEach(c => c.style.display = 'none');
       // Also hide all detail panels when switching lens type
       document.querySelectorAll('[id^="lensDetailPanel_"]').forEach(p => p.style.display = 'none');
@@ -928,6 +939,10 @@
       if (container) {
         container.style.display = 'block';
         container.style.animation = 'slideDown 0.3s ease';
+        if (selectedLensTypeName !== 'Zero Power') {
+          const activeInput = container.querySelector('.prescriptionFileInput');
+          if (activeInput) activeInput.disabled = false;
+        }
       }
 
       document.querySelectorAll('input[name="lens_option_radio"]').forEach(r => {
@@ -1039,7 +1054,8 @@
         
         let prescriptionOk = true;
         if (selectedLensTypeName && selectedLensTypeName !== 'Zero Power') {
-          const fileInput = document.querySelector('.prescriptionFileInput');
+          const container = document.getElementById('options-container-' + selectedLensTypeId);
+          const fileInput = container ? container.querySelector('.prescriptionFileInput') : null;
           prescriptionOk = fileInput && fileInput.files && fileInput.files.length > 0;
         }
         
