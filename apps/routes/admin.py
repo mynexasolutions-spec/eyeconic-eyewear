@@ -213,7 +213,7 @@ def register(app):
                         str(uuid.uuid4()), name, slug, sku,
                         f.get("type", "simple"), f.get("description"), f.get("short_description"),
                         float(f.get("price") or 0), float(f.get("sale_price") or 0) or None,
-                        stock_qty, stock_status, 1,
+                        stock_qty, stock_status, True,
                         f.get("category_id") or None, f.get("brand_id") or None,
                         1 if f.get("is_featured") == "on" else 0, 1 if f.get("is_active", "on") == "on" else 0,
                         1 if f.get("is_lens_compatible") == "on" else 0,

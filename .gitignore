@@ -49,3 +49,6 @@ apps/static/uploads/
 
 # Databases
 *.db
+
+# Private Keys
+*.pem
