@@ -216,7 +216,7 @@ def register(app):
                         stock_qty, stock_status, True,
                         f.get("category_id") or None, f.get("brand_id") or None,
                         1 if f.get("is_featured") == "on" else 0, 1 if f.get("is_active", "on") == "on" else 0,
-                        1 if f.get("is_lens_compatible") == "on" else 0,
+                        True if f.get("is_lens_compatible") == "on" else False,
                     ]
                 )["id"]
 
@@ -304,7 +304,7 @@ def register(app):
                         int(f.get("stock_quantity") or 0), f.get("stock_status"),
                         f.get("category_id") or None, f.get("brand_id") or None,
                         1 if f.get("is_featured") == "on" else 0, 1 if f.get("is_active") == "on" else 0,
-                        1 if f.get("is_lens_compatible") == "on" else 0,
+                        True if f.get("is_lens_compatible") == "on" else False,
                         product_id
                     ]
                 )
