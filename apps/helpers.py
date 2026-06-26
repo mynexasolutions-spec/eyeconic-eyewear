@@ -72,6 +72,18 @@ def get_cached_store_settings():
     return get_store_settings()
 
 
+def calc_shipping(subtotal, settings=None):
+    if settings is None:
+        settings = get_cached_store_settings()
+    if settings.get("free_shipping_all") == "true":
+        return 0.0
+    fee       = float(settings.get("shipping_fee") or 49)
+    threshold = float(settings.get("free_shipping_threshold") or 599)
+    if settings.get("free_shipping_enabled", "true") == "true" and subtotal >= threshold:
+        return 0.0
+    return fee
+
+
 def refresh_cart_prices(cart):
     refreshed = {}
     subtotal  = 0

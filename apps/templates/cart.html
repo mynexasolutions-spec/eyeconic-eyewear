@@ -129,7 +129,7 @@
           <span id="cartShipping">{% if shipping == 0 %}Free{% else %}₹{{ "%.0f"|format(shipping) }}{% endif %}</span>
         </div>
         <div class="shipping-info" id="shippingNote">
-          {% if shipping != 0 %}Add ₹{{ "%.0f"|format(999 - subtotal) }} more for free shipping.{% else %}You qualify for free shipping!{% endif %}
+          {% if shipping != 0 %}Add ₹{{ "%.0f"|format(free_shipping_threshold - subtotal) }} more for free shipping.{% else %}You qualify for free shipping!{% endif %}
         </div>
         <div class="summary-row total">
           <span>Total</span>
@@ -192,13 +192,15 @@
       sub += line;
       row.querySelector('.item-total').textContent = formatMoney(line);
     });
-    const ship = sub >= 999 ? 0 : 99;
+    const shippingFee = {{ shipping_fee }};
+    const freeShippingThreshold = {{ free_shipping_threshold }};
+    const ship = sub >= freeShippingThreshold ? 0 : shippingFee;
     document.getElementById('cartSubtotal').textContent = formatMoney(sub);
     document.getElementById('cartShipping').textContent = ship === 0 ? 'Free' : formatMoney(ship);
     document.getElementById('cartTotal').textContent = formatMoney(sub + ship);
     const note = document.getElementById('shippingNote');
     if(ship === 0) { note.textContent = 'You qualify for free shipping!'; }
-    else { note.textContent = 'Add ' + formatMoney(999 - sub) + ' more for free shipping.'; }
+    else { note.textContent = 'Add ' + formatMoney(freeShippingThreshold - sub) + ' more for free shipping.'; }
   }
 </script>
 {% endblock %}

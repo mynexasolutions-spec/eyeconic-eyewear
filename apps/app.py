@@ -101,6 +101,23 @@ import os as _os
 if _os.environ.get("WERKZEUG_RUN_MAIN") != "true":
     try:
         db.migrate()
+        # Seed default store settings if table is empty
+        try:
+            count_res = db.query_one("SELECT COUNT(*) as count FROM store_settings")
+            if count_res and count_res.get("count") == 0:
+                defaults = [
+                    ("cod_enabled", "true"),
+                    ("online_payment_enabled", "false"),
+                    ("free_shipping_enabled", "true"),
+                    ("free_shipping_all", "false"),
+                    ("shipping_fee", "49"),
+                    ("free_shipping_threshold", "599"),
+                ]
+                for key, val in defaults:
+                    db.execute("INSERT INTO store_settings (key, value) VALUES (?, ?)", [key, val])
+                print("[db.migrate] Seeded default store settings.")
+        except Exception as _e:
+            print(f"[db.migrate] Error seeding settings: {_e}")
     except Exception as _e:
         print(f"[db.migrate] {_e}")
 

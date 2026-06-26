@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify
 import db
-from helpers import refresh_cart_prices
+from helpers import refresh_cart_prices, calc_shipping
 from queries import PRODUCTS_SELECT
 
 bp = Blueprint("cart", __name__)
@@ -11,13 +11,22 @@ def view_cart():
     cart_items = session.get("cart", {})
     cart_items, subtotal = refresh_cart_prices(cart_items)
     session["cart"] = cart_items
-    shipping = 0 if subtotal >= 999 else 99
+    
+    from helpers import get_cached_store_settings
+    settings = get_cached_store_settings()
+    shipping = calc_shipping(subtotal, settings)
+    
+    fee       = float(settings.get("shipping_fee") or 49)
+    threshold = float(settings.get("free_shipping_threshold") or 599)
+    
     return render_template(
         "cart.html",
         cart_items=cart_items,
         subtotal=subtotal,
         shipping=shipping,
         total=subtotal + shipping,
+        shipping_fee=fee,
+        free_shipping_threshold=threshold,
     )
 
 
