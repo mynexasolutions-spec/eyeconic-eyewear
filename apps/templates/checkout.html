@@ -628,6 +628,11 @@
       const data = await resp.json();
       if (!data.success) throw new Error(data.message || 'Could not create payment order.');
 
+      if (data.free_order) {
+        checkoutForm.submit();
+        return;
+      }
+
       // Step 2: Open Razorpay checkout
       const options = {
         key:         RZP_KEY_ID,

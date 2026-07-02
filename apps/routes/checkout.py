@@ -141,6 +141,9 @@ def rzp_create_order():
         amount_total = max(0.0, subtotal + shipping - discount)
         amount_paisa = int(round(amount_total * 100))
 
+        if amount_paisa == 0:
+            return jsonify({"success": True, "free_order": True})
+
         client = razorpay.Client(auth=(key_id, key_secret))
         order  = client.order.create({
             "amount":          amount_paisa,
@@ -258,31 +261,34 @@ def checkout():
 
         payment_status = "pending"
         if payment_method == "razorpay":
-            razorpay, import_error = _load_razorpay()
-            if not razorpay:
-                flash(f"Online payment dependency error: {import_error}", "error")
-                return redirect(url_for("checkout.checkout"))
+            if total > 0:
+                razorpay, import_error = _load_razorpay()
+                if not razorpay:
+                    flash(f"Online payment dependency error: {import_error}", "error")
+                    return redirect(url_for("checkout.checkout"))
 
-            rzp_payment_id = request.form.get("razorpay_payment_id", "").strip()
-            rzp_order_id   = request.form.get("razorpay_order_id", "").strip()
-            rzp_signature  = request.form.get("razorpay_signature", "").strip()
-            if not rzp_payment_id or not rzp_order_id or not rzp_signature:
-                flash("Payment information is incomplete. Please try again.", "error")
-                return redirect(url_for("checkout.checkout"))
-            try:
-                client = razorpay.Client(auth=(razorpay_key_id, razorpay_key_secret))
-                client.utility.verify_payment_signature({
-                    "razorpay_order_id":   rzp_order_id,
-                    "razorpay_payment_id": rzp_payment_id,
-                    "razorpay_signature":  rzp_signature,
-                })
+                rzp_payment_id = request.form.get("razorpay_payment_id", "").strip()
+                rzp_order_id   = request.form.get("razorpay_order_id", "").strip()
+                rzp_signature  = request.form.get("razorpay_signature", "").strip()
+                if not rzp_payment_id or not rzp_order_id or not rzp_signature:
+                    flash("Payment information is incomplete. Please try again.", "error")
+                    return redirect(url_for("checkout.checkout"))
+                try:
+                    client = razorpay.Client(auth=(razorpay_key_id, razorpay_key_secret))
+                    client.utility.verify_payment_signature({
+                        "razorpay_order_id":   rzp_order_id,
+                        "razorpay_payment_id": rzp_payment_id,
+                        "razorpay_signature":  rzp_signature,
+                    })
+                    payment_status = "paid"
+                except razorpay.errors.SignatureVerificationError:
+                    flash("Payment signature verification failed. Please contact support if your money was deducted.", "error")
+                    return redirect(url_for("checkout.checkout"))
+                except Exception:
+                    flash("Payment verification failed. Please contact support if your money was deducted.", "error")
+                    return redirect(url_for("checkout.checkout"))
+            else:
                 payment_status = "paid"
-            except razorpay.errors.SignatureVerificationError:
-                flash("Payment signature verification failed. Please contact support if your money was deducted.", "error")
-                return redirect(url_for("checkout.checkout"))
-            except Exception:
-                flash("Payment verification failed. Please contact support if your money was deducted.", "error")
-                return redirect(url_for("checkout.checkout"))
 
         shipping_addr = shipping_addr or {
             "first_name": addr_first, "last_name": addr_last, "phone": addr_phone,
