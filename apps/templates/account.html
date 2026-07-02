@@ -69,7 +69,7 @@
                 <span class="status-badge {% if o.status == 'delivered' %}status-delivered{% elif o.status == 'cancelled' %}status-cancelled{% else %}status-default{% endif %}">{{ o.status }}</span>
               </td>
               <td style="padding:1.25rem 0; text-align:right;">
-                <a href="{{ url_for('public.order_detail', order_id=o.id) }}" style="color:var(--charcoal); font-size:0.75rem; font-weight:700; text-decoration:none; border-bottom:1.5px solid var(--gold);">View Details</a>
+                <a href="{{ url_for('checkout.order_detail', order_id=o.id) }}" style="color:var(--charcoal); font-size:0.75rem; font-weight:700; text-decoration:none; border-bottom:1.5px solid var(--gold);">View Details</a>
               </td>
             </tr>
             {% endfor %}
@@ -96,6 +96,9 @@
           <p style="font-size:0.9rem; font-weight:600;">{{ user.email }}</p>
         </div>
         <a href="#" style="display:block; padding:12px; background:var(--cream); text-align:center; color:var(--charcoal); font-size:0.75rem; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; text-decoration:none; margin-top:2rem;">Edit Profile</a>
+        {% if user.role in ('admin', 'manager') or user.get('role') in ('admin', 'manager') or (session.get('user') and session['user'].get('role') in ('admin', 'manager')) %}
+        <a href="{{ url_for('admin_dashboard') }}" style="display:block; padding:12px; background:var(--gold); text-align:center; color:#fff; font-size:0.75rem; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; text-decoration:none; margin-top:1rem; transition: background-color 0.2s;">Admin Dashboard</a>
+        {% endif %}
       </div>
     </aside>
   </div>
