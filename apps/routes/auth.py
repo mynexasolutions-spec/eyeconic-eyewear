@@ -127,6 +127,28 @@ def account():
                     flash("Profile updated successfully.", "success")
                 except Exception as e:
                     flash(f"Error updating profile: {e}", "error")
+        elif action == "change_password":
+            current_pw = request.form.get("current_password", "")
+            new_pw     = request.form.get("new_password", "")
+            confirm_pw = request.form.get("confirm_password", "")
+
+            if not current_pw or not new_pw or not confirm_pw:
+                flash("All password fields are required.", "error")
+            elif new_pw != confirm_pw:
+                flash("New passwords do not match.", "error")
+            elif len(new_pw) < 6:
+                flash("New password must be at least 6 characters long.", "error")
+            else:
+                try:
+                    user = db.query_one("SELECT password_hash FROM users WHERE id=?", [uid])
+                    if not user or not bcrypt.checkpw(current_pw[:72].encode("utf-8"), user.get("password_hash", "").encode("utf-8")):
+                        flash("Incorrect current password.", "error")
+                    else:
+                        hashed = bcrypt.hashpw(new_pw[:72].encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+                        db.execute("UPDATE users SET password_hash=? WHERE id=?", [hashed, uid])
+                        flash("Password updated successfully.", "success")
+                except Exception as e:
+                    flash(f"Error changing password: {e}", "error")
         elif action == "add_address":
             try:
                 is_default = request.form.get("is_default") == "on"
