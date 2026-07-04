@@ -7,12 +7,13 @@ import psycopg2
 import psycopg2.extras
 from psycopg2.pool import ThreadedConnectionPool
 from dotenv import load_dotenv
+from typing import Optional
 
 load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 
-_pool: ThreadedConnectionPool | None = None
+_pool: Optional[ThreadedConnectionPool] = None
 
 
 def _build_pool() -> ThreadedConnectionPool:
