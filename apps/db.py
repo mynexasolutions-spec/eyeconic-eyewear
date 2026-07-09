@@ -134,6 +134,17 @@ def transaction():
                 cur.execute(_adapt(sql), params or ())
                 return cur.rowcount
 
+            def execute_returning(self, sql, params=None):
+                cur = conn.cursor()
+                cur.execute(_adapt(sql), params or ())
+                row = cur.fetchone()
+                return dict(row) if row else None
+
+            def query(self, sql, params=None):
+                cur = conn.cursor()
+                cur.execute(_adapt(sql), params or ())
+                return [dict(r) for r in cur.fetchall()]
+
             def query_one(self, sql, params=None):
                 cur = conn.cursor()
                 cur.execute(_adapt(sql), params or ())

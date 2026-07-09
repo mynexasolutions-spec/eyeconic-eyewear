@@ -154,10 +154,15 @@
             <div
               style="width:80px; height:80px; border-radius:8px; overflow:hidden; border:1px solid var(--admin-border); position:relative;">
               <img src="{{ resolve_image(img.image_url) }}" style="width:100%; height:100%; object-fit:contain;" />
-              <label
-                style="position:absolute; bottom:0; left:0; right:0; background:rgba(239,68,68,0.8); color:white; font-size:0.6rem; text-align:center; cursor:pointer; padding:2px;">
-                <input type="checkbox" name="delete_image_{{ img.id }}" style="display:none;" /> Delete
-              </label>
+              <form method="post" action="{{ url_for('admin_product_image_delete', product_id=product.id, image_id=img.id) }}"
+                    onsubmit="return confirm('Delete this image?');"
+                    style="position:absolute; bottom:0; left:0; right:0; margin:0;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                <button type="submit"
+                  style="width:100%; background:rgba(239,68,68,0.8); color:white; font-size:0.6rem; text-align:center; cursor:pointer; padding:2px; border:none;">
+                  Delete
+                </button>
+              </form>
             </div>
             {% endif %}
             {% endfor %}

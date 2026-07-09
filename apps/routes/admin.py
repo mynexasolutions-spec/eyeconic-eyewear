@@ -38,7 +38,7 @@ def generate_unique_variation_sku(base_sku=None, exclude_id=None):
     return f"{base}-{uuid.uuid4().hex[:10].upper()}"
 
 
-def generate_variations(product_id):
+def generate_variations(product_id, executor=None):
     """
     For variable products, we no longer pre-generate all cartesian-product
     variation rows.  The storefront product page already loads the available
@@ -49,15 +49,19 @@ def generate_variations(product_id):
     Instead, we create ONE placeholder variation per product so that the
     admin 'Manage Variations' panel still works for editing, and the product
     is recognized as having variations.
+
+    `executor` may be the `db` module or an open `db.transaction()` handle
+    (`tx`) so this can participate in a caller's transaction.
     """
-    existing = db.query_one(
+    ex = executor or db
+    existing = ex.query_one(
         "SELECT id FROM product_variations WHERE product_id = ? LIMIT 1",
         [product_id],
     )
     if existing:
         return  # already has at least one variation row
 
-    product = db.query_one(
+    product = ex.query_one(
         "SELECT price, sale_price, stock_quantity, sku FROM products WHERE id = ?",
         [product_id],
     )
@@ -70,11 +74,30 @@ def generate_variations(product_id):
 
     var_id  = str(uuid.uuid4())
     var_sku = generate_unique_variation_sku(base_sku)
-    db.execute(
+    ex.execute(
         "INSERT INTO product_variations (id, product_id, sku, price, stock_quantity) "
         "VALUES (?,?,?,?,?)",
         [var_id, product_id, var_sku, base_price, base_stock],
     )
+
+def get_attributes_with_options():
+    """All attributes plus their values, loaded in 2 queries instead of 1 + N."""
+    attributes = db.query("SELECT * FROM attributes ORDER BY name ASC")
+    if not attributes:
+        return attributes
+    attr_ids     = [a["id"] for a in attributes]
+    placeholders = ",".join(["?"] * len(attr_ids))
+    all_values   = db.query(
+        f"SELECT * FROM attribute_values WHERE attribute_id IN ({placeholders}) ORDER BY value ASC",
+        attr_ids,
+    )
+    values_by_attr = {}
+    for v in all_values:
+        values_by_attr.setdefault(str(v["attribute_id"]), []).append(v)
+    for attr in attributes:
+        attr["options"] = values_by_attr.get(str(attr["id"]), [])
+    return attributes
+
 
 def require_admin(f):
     @wraps(f)
@@ -184,11 +207,7 @@ def register(app):
     def admin_product_new():
         categories     = get_categories()
         brands         = get_brands()
-        all_attributes = db.query("SELECT * FROM attributes ORDER BY name ASC")
-        for attr in all_attributes:
-            attr["options"] = db.query(
-                "SELECT * FROM attribute_values WHERE attribute_id = ? ORDER BY value ASC", [attr["id"]]
-            )
+        all_attributes = get_attributes_with_options()
         
         if request.method == "POST":
             f = request.form
@@ -203,64 +222,68 @@ def register(app):
                 sku_input = f.get("sku", "").strip()
                 sku = sku_input or generate_unique_product_sku(name)
 
-                product_id = db.execute_returning(
-                    """INSERT INTO products
-                       (id, name, slug, sku, type, description, short_description,
-                        price, sale_price, stock_quantity, stock_status, manage_stock,
-                        category_id, brand_id, is_featured, is_active, is_lens_compatible)
-                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) RETURNING id""",
-                    [
-                        str(uuid.uuid4()), name, slug, sku,
-                        f.get("type", "simple"), f.get("description"), f.get("short_description"),
-                        float(f.get("price") or 0), float(f.get("sale_price") or 0) or None,
-                        stock_qty, stock_status, True,
-                        f.get("category_id") or None, f.get("brand_id") or None,
-                        1 if f.get("is_featured") == "on" else 0, 1 if f.get("is_active", "on") == "on" else 0,
-                        True if f.get("is_lens_compatible") == "on" else False,
-                    ]
-                )["id"]
-
-                # Handle Primary Image
+                # Uploads happen outside the transaction (they're network calls to Cloudinary)
                 primary_file = request.files.get("primary_image")
-                if primary_file and primary_file.filename:
-                    url = handle_upload(primary_file)
-                    mid = str(uuid.uuid4())
-                    db.execute("INSERT INTO media (id, file_url) VALUES (?,?)", [mid, url])
-                    db.execute("INSERT INTO product_images (id, product_id, media_id, is_primary, display_order) VALUES (?,?,?,1,0)", [str(uuid.uuid4()), product_id, mid])
+                primary_url = handle_upload(primary_file) if primary_file and primary_file.filename else None
 
-                # Handle Gallery Images
                 gallery_files = request.files.getlist("gallery_images")
-                if gallery_files and any(g.filename for g in gallery_files):
-                    for i, gfile in enumerate(gallery_files):
-                        if gfile and gfile.filename:
-                            url = handle_upload(gfile)
-                            mid = str(uuid.uuid4())
-                            db.execute("INSERT INTO media (id, file_url) VALUES (?,?)", [mid, url])
-                            db.execute("INSERT INTO product_images (id, product_id, media_id, is_primary, display_order) VALUES (?,?,?,0,?)", [str(uuid.uuid4()), product_id, mid, i+1])
+                gallery_urls  = [handle_upload(gfile) for gfile in gallery_files if gfile and gfile.filename]
 
-                attr_ids = request.form.getlist("attribute_ids")
-                if attr_ids:
-                    values_sql = ",".join(["(?,?,?)"] * len(attr_ids))
-                    params = []
-                    for attr_id in attr_ids:
-                        params.extend([str(uuid.uuid4()), product_id, attr_id])
-                    db.execute(
-                        f"INSERT INTO product_attributes (id, product_id, attribute_id) VALUES {values_sql}",
-                        params
-                    )
+                attr_ids     = request.form.getlist("attribute_ids")
+                val_ids      = request.form.getlist("attribute_value_ids")
+                is_variable  = f.get("type") == "variable"
 
-                val_ids = request.form.getlist("attribute_value_ids")
-                if val_ids:
-                    values_sql = ",".join(["(?,?,?)"] * len(val_ids))
-                    params = []
-                    for val_id in val_ids:
-                        params.extend([str(uuid.uuid4()), product_id, val_id])
-                    db.execute(
-                        f"INSERT INTO product_attribute_values (id, product_id, attribute_value_id) VALUES {values_sql}",
-                        params
-                    )
-                if f.get("type") == "variable":
-                    generate_variations(product_id)
+                with db.transaction() as tx:
+                    product_id = tx.execute_returning(
+                        """INSERT INTO products
+                           (id, name, slug, sku, type, description, short_description,
+                            price, sale_price, stock_quantity, stock_status, manage_stock,
+                            category_id, brand_id, is_featured, is_active, is_lens_compatible)
+                           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) RETURNING id""",
+                        [
+                            str(uuid.uuid4()), name, slug, sku,
+                            f.get("type", "simple"), f.get("description"), f.get("short_description"),
+                            float(f.get("price") or 0), float(f.get("sale_price") or 0) or None,
+                            stock_qty, stock_status, True,
+                            f.get("category_id") or None, f.get("brand_id") or None,
+                            1 if f.get("is_featured") == "on" else 0, 1 if f.get("is_active", "on") == "on" else 0,
+                            True if f.get("is_lens_compatible") == "on" else False,
+                        ]
+                    )["id"]
+
+                    # Primary Image
+                    if primary_url:
+                        mid = str(uuid.uuid4())
+                        tx.execute("INSERT INTO media (id, file_url) VALUES (?,?)", [mid, primary_url])
+                        tx.execute("INSERT INTO product_images (id, product_id, media_id, is_primary, display_order) VALUES (?,?,?,1,0)", [str(uuid.uuid4()), product_id, mid])
+
+                    # Gallery Images
+                    for i, url in enumerate(gallery_urls):
+                        mid = str(uuid.uuid4())
+                        tx.execute("INSERT INTO media (id, file_url) VALUES (?,?)", [mid, url])
+                        tx.execute("INSERT INTO product_images (id, product_id, media_id, is_primary, display_order) VALUES (?,?,?,0,?)", [str(uuid.uuid4()), product_id, mid, i+1])
+
+                    if attr_ids:
+                        values_sql = ",".join(["(?,?,?)"] * len(attr_ids))
+                        params = []
+                        for attr_id in attr_ids:
+                            params.extend([str(uuid.uuid4()), product_id, attr_id])
+                        tx.execute(
+                            f"INSERT INTO product_attributes (id, product_id, attribute_id) VALUES {values_sql}",
+                            params
+                        )
+
+                    if val_ids:
+                        values_sql = ",".join(["(?,?,?)"] * len(val_ids))
+                        params = []
+                        for val_id in val_ids:
+                            params.extend([str(uuid.uuid4()), product_id, val_id])
+                        tx.execute(
+                            f"INSERT INTO product_attribute_values (id, product_id, attribute_value_id) VALUES {values_sql}",
+                            params
+                        )
+                    if is_variable:
+                        generate_variations(product_id, executor=tx)
 
                 get_products.cache_clear()
                 get_homepage_products.cache_clear()
@@ -280,9 +303,7 @@ def register(app):
         
         categories = get_categories()
         brands = get_brands()
-        all_attributes = db.query("SELECT * FROM attributes ORDER BY name ASC")
-        for attr in all_attributes:
-            attr["options"] = db.query("SELECT * FROM attribute_values WHERE attribute_id = ? ORDER BY value ASC", [attr["id"]])
+        all_attributes = get_attributes_with_options()
         
         if request.method == "POST":
             f = request.form
@@ -294,52 +315,61 @@ def register(app):
                 slug = get_unique_slug("products", f.get("slug") or slugify(name), exclude_id=product_id)
                 sku_input = (f.get("sku") or "").strip()
                 updated_sku = sku_input or product.get("sku") or generate_unique_product_sku(name)
-                db.execute(
-                     """UPDATE products SET name=?, slug=?, sku=?, type=?, description=?,
-                        short_description=?, price=?, sale_price=?, stock_quantity=?, stock_status=?,
-                        category_id=?, brand_id=?, is_featured=?, is_active=?, is_lens_compatible=? WHERE id=?""",
-                    [
-                        name, slug, updated_sku, f.get("type"), f.get("description"),
-                        f.get("short_description"), float(f.get("price") or 0), float(f.get("sale_price") or 0) or None,
-                        int(f.get("stock_quantity") or 0), f.get("stock_status"),
-                        f.get("category_id") or None, f.get("brand_id") or None,
-                        1 if f.get("is_featured") == "on" else 0, 1 if f.get("is_active") == "on" else 0,
-                        True if f.get("is_lens_compatible") == "on" else False,
-                        product_id
-                    ]
-                )
 
-                # Handle Primary Image
+                # Uploads happen outside the transaction (they're network calls to Cloudinary)
                 primary_file = request.files.get("primary_image")
-                if primary_file and primary_file.filename:
-                    url = handle_upload(primary_file)
-                    mid = str(uuid.uuid4())
-                    db.execute("INSERT INTO media (id, file_url) VALUES (?,?)", [mid, url])
-                    db.execute("DELETE FROM product_images WHERE product_id=? AND is_primary=1", [product_id])
-                    db.execute("INSERT INTO product_images (id, product_id, media_id, is_primary, display_order) VALUES (?,?,?,1,0)", [str(uuid.uuid4()), product_id, mid])
+                primary_url = handle_upload(primary_file) if primary_file and primary_file.filename else None
 
-                # Handle New Gallery Images
                 gallery_files = request.files.getlist("gallery_images")
-                for gfile in gallery_files:
-                    if gfile and gfile.filename:
-                        url = handle_upload(gfile)
+                gallery_urls  = [handle_upload(gfile) for gfile in gallery_files if gfile and gfile.filename]
+
+                attr_ids = request.form.getlist("attribute_ids")
+                val_ids  = request.form.getlist("attribute_value_ids")
+
+                with db.transaction() as tx:
+                    tx.execute(
+                         """UPDATE products SET name=?, slug=?, sku=?, type=?, description=?,
+                            short_description=?, price=?, sale_price=?, stock_quantity=?, stock_status=?,
+                            category_id=?, brand_id=?, is_featured=?, is_active=?, is_lens_compatible=? WHERE id=?""",
+                        [
+                            name, slug, updated_sku, f.get("type"), f.get("description"),
+                            f.get("short_description"), float(f.get("price") or 0), float(f.get("sale_price") or 0) or None,
+                            int(f.get("stock_quantity") or 0), f.get("stock_status"),
+                            f.get("category_id") or None, f.get("brand_id") or None,
+                            1 if f.get("is_featured") == "on" else 0, 1 if f.get("is_active") == "on" else 0,
+                            True if f.get("is_lens_compatible") == "on" else False,
+                            product_id
+                        ]
+                    )
+
+                    # Primary Image
+                    if primary_url:
                         mid = str(uuid.uuid4())
-                        db.execute("INSERT INTO media (id, file_url) VALUES (?,?)", [mid, url])
-                        db.execute("INSERT INTO product_images (id, product_id, media_id, is_primary) VALUES (?,?,?,0)", [str(uuid.uuid4()), product_id, mid])
+                        tx.execute("INSERT INTO media (id, file_url) VALUES (?,?)", [mid, primary_url])
+                        tx.execute("DELETE FROM product_images WHERE product_id=? AND is_primary=1", [product_id])
+                        tx.execute("INSERT INTO product_images (id, product_id, media_id, is_primary, display_order) VALUES (?,?,?,1,0)", [str(uuid.uuid4()), product_id, mid])
 
-                # Handle Deletions
-                for key in request.form:
-                    if key.startswith("delete_image_"):
-                        img_id = key.replace("delete_image_", "")
-                        db.execute("DELETE FROM product_images WHERE id=?", [img_id])
+                    # New Gallery Images
+                    for url in gallery_urls:
+                        mid = str(uuid.uuid4())
+                        tx.execute("INSERT INTO media (id, file_url) VALUES (?,?)", [mid, url])
+                        tx.execute("INSERT INTO product_images (id, product_id, media_id, is_primary) VALUES (?,?,?,0)", [str(uuid.uuid4()), product_id, mid])
 
-                db.execute("DELETE FROM product_attributes WHERE product_id=?", [product_id])
-                for aid in request.form.getlist("attribute_ids"):
-                    db.execute("INSERT INTO product_attributes (id, product_id, attribute_id) VALUES (?,?,?)", [str(uuid.uuid4()), product_id, aid])
-                
-                db.execute("DELETE FROM product_attribute_values WHERE product_id=?", [product_id])
-                for vid in request.form.getlist("attribute_value_ids"):
-                    db.execute("INSERT INTO product_attribute_values (id, product_id, attribute_value_id) VALUES (?,?,?)", [str(uuid.uuid4()), product_id, vid])
+                    tx.execute("DELETE FROM product_attributes WHERE product_id=?", [product_id])
+                    if attr_ids:
+                        values_sql = ",".join(["(?,?,?)"] * len(attr_ids))
+                        params = []
+                        for aid in attr_ids:
+                            params.extend([str(uuid.uuid4()), product_id, aid])
+                        tx.execute(f"INSERT INTO product_attributes (id, product_id, attribute_id) VALUES {values_sql}", params)
+
+                    tx.execute("DELETE FROM product_attribute_values WHERE product_id=?", [product_id])
+                    if val_ids:
+                        values_sql = ",".join(["(?,?,?)"] * len(val_ids))
+                        params = []
+                        for vid in val_ids:
+                            params.extend([str(uuid.uuid4()), product_id, vid])
+                        tx.execute(f"INSERT INTO product_attribute_values (id, product_id, attribute_value_id) VALUES {values_sql}", params)
 
                 get_products.cache_clear()
                 get_homepage_products.cache_clear()
@@ -368,15 +398,43 @@ def register(app):
             action="edit"
         )
 
+    @app.route("/admin/products/<product_id>/images/<image_id>/delete", methods=["POST"])
+    @require_admin
+    def admin_product_image_delete(product_id, image_id):
+        try:
+            db.execute(
+                "DELETE FROM product_images WHERE id=? AND product_id=?",
+                [image_id, product_id]
+            )
+            get_products.cache_clear()
+            get_homepage_products.cache_clear()
+            get_product_detail.cache_clear()
+            flash("Image deleted.", "success")
+        except Exception as e:
+            flash(f"Error deleting image: {e}", "error")
+        return redirect(url_for("admin_product_edit", product_id=product_id))
+
     @app.route("/admin/products/<product_id>/delete", methods=["POST"])
     @require_admin
     def admin_product_delete(product_id):
         try:
-            db.execute("UPDATE products SET is_active=0 WHERE id=?", [product_id])
+            with db.transaction() as tx:
+                # Preserve order history: unlink rather than delete order_items
+                tx.execute("UPDATE order_items SET product_id = NULL WHERE product_id = ?", [product_id])
+                tx.execute("DELETE FROM product_reviews WHERE product_id = ?", [product_id])
+                tx.execute("DELETE FROM product_attribute_values WHERE product_id = ?", [product_id])
+                tx.execute("DELETE FROM product_attributes WHERE product_id = ?", [product_id])
+                tx.execute(
+                    "DELETE FROM variation_attribute_values WHERE variation_id IN "
+                    "(SELECT id FROM product_variations WHERE product_id = ?)", [product_id]
+                )
+                tx.execute("DELETE FROM product_variations WHERE product_id = ?", [product_id])
+                tx.execute("DELETE FROM product_images WHERE product_id = ?", [product_id])
+                tx.execute("DELETE FROM products WHERE id = ?", [product_id])
             get_products.cache_clear()
             get_homepage_products.cache_clear()
             get_product_detail.cache_clear()
-            flash("Product deleted (deactivated).", "success")
+            flash("Product deleted permanently.", "success")
         except Exception as e:
             flash(f"Error: {e}", "error")
         return redirect(url_for("admin_products"))
@@ -451,10 +509,10 @@ def register(app):
     def admin_category_delete(cat_id):
         try:
             # Manually decouple products and subcategories before deletion
-            db.execute("UPDATE products SET category_id = NULL WHERE category_id = ?", [cat_id])
-            db.execute("UPDATE categories SET parent_id = NULL WHERE parent_id = ?", [cat_id])
-            
-            db.execute("DELETE FROM categories WHERE id=?", [cat_id])
+            with db.transaction() as tx:
+                tx.execute("UPDATE products SET category_id = NULL WHERE category_id = ?", [cat_id])
+                tx.execute("UPDATE categories SET parent_id = NULL WHERE parent_id = ?", [cat_id])
+                tx.execute("DELETE FROM categories WHERE id=?", [cat_id])
             get_categories.cache_clear()
             get_featured_categories.cache_clear()
             flash("Category deleted.", "success")
@@ -467,6 +525,13 @@ def register(app):
     @app.route("/admin/brands")
     @require_admin
     def admin_brands():
+        import math
+        try:
+            page = max(1, int(request.args.get("page", 1)))
+        except (ValueError, TypeError):
+            page = 1
+        per_page = 20
+        offset   = (page - 1) * per_page
         try:
             brands = db.query(
                 """
@@ -475,12 +540,18 @@ def register(app):
                 LEFT JOIN products p ON p.brand_id = b.id
                 GROUP BY b.id
                 ORDER BY b.name ASC
-                """
+                LIMIT ? OFFSET ?
+                """,
+                [per_page, offset]
             )
+            total       = (db.query_one("SELECT COUNT(*) AS cnt FROM brands") or {}).get("cnt", 0)
+            total_pages = max(1, math.ceil(total / per_page))
         except Exception as e:
-            brands = []
+            brands, total, total_pages = [], 0, 1
             flash(f"Error: {e}", "error")
-        return render_template("admin/brands.html", brands=brands)
+        return render_template(
+            "admin/brands.html", brands=brands, total=total, total_pages=total_pages, page=page
+        )
 
     @app.route("/admin/brands/new", methods=["GET", "POST"])
     @require_admin
@@ -528,9 +599,9 @@ def register(app):
     def admin_brand_delete(brand_id):
         try:
             # Manually decouple products before deletion
-            db.execute("UPDATE products SET brand_id = NULL WHERE brand_id = ?", [brand_id])
-            
-            db.execute("DELETE FROM brands WHERE id=?", [brand_id])
+            with db.transaction() as tx:
+                tx.execute("UPDATE products SET brand_id = NULL WHERE brand_id = ?", [brand_id])
+                tx.execute("DELETE FROM brands WHERE id=?", [brand_id])
             flash("Brand deleted.", "success")
         except Exception as e:
             flash(f"Error: {e}", "error")
@@ -622,22 +693,50 @@ def register(app):
     @app.route("/admin/customers")
     @require_admin
     def admin_customers():
+        import math
         try:
-            customers = db.query("SELECT * FROM users WHERE role='customer' ORDER BY created_at DESC")
+            page = max(1, int(request.args.get("page", 1)))
+        except (ValueError, TypeError):
+            page = 1
+        per_page = 20
+        offset   = (page - 1) * per_page
+        try:
+            customers = db.query(
+                "SELECT * FROM users WHERE role='customer' ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                [per_page, offset]
+            )
+            total       = (db.query_one("SELECT COUNT(*) AS cnt FROM users WHERE role='customer'") or {}).get("cnt", 0)
+            total_pages = max(1, math.ceil(total / per_page))
         except Exception as e:
-            customers = []
+            customers, total, total_pages = [], 0, 1
             flash(f"Error: {e}", "error")
-        return render_template("admin/customers.html", customers=customers)
+        return render_template(
+            "admin/customers.html", customers=customers, total=total, total_pages=total_pages, page=page
+        )
 
     @app.route("/admin/subscribers")
     @require_admin
     def admin_subscribers():
+        import math
         try:
-            subscribers = db.query("SELECT * FROM newsletter_subscribers ORDER BY subscribed_at DESC")
+            page = max(1, int(request.args.get("page", 1)))
+        except (ValueError, TypeError):
+            page = 1
+        per_page = 20
+        offset   = (page - 1) * per_page
+        try:
+            subscribers = db.query(
+                "SELECT * FROM newsletter_subscribers ORDER BY subscribed_at DESC LIMIT ? OFFSET ?",
+                [per_page, offset]
+            )
+            total       = (db.query_one("SELECT COUNT(*) AS cnt FROM newsletter_subscribers") or {}).get("cnt", 0)
+            total_pages = max(1, math.ceil(total / per_page))
         except Exception as e:
-            subscribers = []
+            subscribers, total, total_pages = [], 0, 1
             flash(f"Error loading subscribers: {e}", "error")
-        return render_template("admin/subscribers.html", subscribers=subscribers)
+        return render_template(
+            "admin/subscribers.html", subscribers=subscribers, total=total, total_pages=total_pages, page=page
+        )
 
     # ── Attributes ─────────────────────────────────────────────────────────────
 
@@ -703,17 +802,18 @@ def register(app):
     def admin_attribute_delete(attr_id):
         try:
             # Cascade: remove all references before deleting the attribute
-            db.execute(
-                "DELETE FROM product_attribute_values WHERE attribute_value_id IN "
-                "(SELECT id FROM attribute_values WHERE attribute_id = ?)", [attr_id]
-            )
-            db.execute(
-                "DELETE FROM variation_attribute_values WHERE attribute_value_id IN "
-                "(SELECT id FROM attribute_values WHERE attribute_id = ?)", [attr_id]
-            )
-            db.execute("DELETE FROM attribute_values WHERE attribute_id = ?", [attr_id])
-            db.execute("DELETE FROM product_attributes WHERE attribute_id = ?", [attr_id])
-            db.execute("DELETE FROM attributes WHERE id = ?", [attr_id])
+            with db.transaction() as tx:
+                tx.execute(
+                    "DELETE FROM product_attribute_values WHERE attribute_value_id IN "
+                    "(SELECT id FROM attribute_values WHERE attribute_id = ?)", [attr_id]
+                )
+                tx.execute(
+                    "DELETE FROM variation_attribute_values WHERE attribute_value_id IN "
+                    "(SELECT id FROM attribute_values WHERE attribute_id = ?)", [attr_id]
+                )
+                tx.execute("DELETE FROM attribute_values WHERE attribute_id = ?", [attr_id])
+                tx.execute("DELETE FROM product_attributes WHERE attribute_id = ?", [attr_id])
+                tx.execute("DELETE FROM attributes WHERE id = ?", [attr_id])
             flash("Attribute deleted", "success")
         except Exception as e:
             flash(f"Error: {e}", "error")
@@ -750,11 +850,21 @@ def register(app):
         f = request.form
         try:
             values = db.query("SELECT id FROM attribute_values WHERE attribute_id = ?", [attr_id])
+            updates = []
             for v in values:
                 v_id = v["id"]
                 new_value = (f.get(f"value_{v_id}") or "").strip()
                 if new_value:
-                    db.execute("UPDATE attribute_values SET value=? WHERE id=?", [new_value, v_id])
+                    updates.append((v_id, new_value))
+            if updates:
+                case_sql = " ".join(["WHEN ? THEN ?"] * len(updates))
+                ids = [v_id for v_id, _ in updates]
+                case_params = [part for pair in updates for part in pair]
+                placeholders = ",".join(["?"] * len(ids))
+                db.execute(
+                    f"UPDATE attribute_values SET value = CASE id {case_sql} END WHERE id IN ({placeholders})",
+                    case_params + ids
+                )
             get_trending_shapes.cache_clear()
             flash("Attribute values updated.", "success")
         except Exception as e:
@@ -767,9 +877,10 @@ def register(app):
         attr_id = request.form.get("attribute_id")
         try:
             # Cascade: remove all product & variation references first
-            db.execute("DELETE FROM product_attribute_values WHERE attribute_value_id = ?", [val_id])
-            db.execute("DELETE FROM variation_attribute_values WHERE attribute_value_id = ?", [val_id])
-            db.execute("DELETE FROM attribute_values WHERE id = ?", [val_id])
+            with db.transaction() as tx:
+                tx.execute("DELETE FROM product_attribute_values WHERE attribute_value_id = ?", [val_id])
+                tx.execute("DELETE FROM variation_attribute_values WHERE attribute_value_id = ?", [val_id])
+                tx.execute("DELETE FROM attribute_values WHERE id = ?", [val_id])
             get_trending_shapes.cache_clear()
             flash("Value deleted", "success")
         except Exception as e:
@@ -823,16 +934,34 @@ def register(app):
             JOIN product_attributes pa ON pa.attribute_id = a.id
             WHERE pa.product_id = ? ORDER BY pa.display_order ASC
         """, [product_id])
-        for attr in linked_attributes:
-            attr["options"] = db.query("""
-                SELECT av.* FROM attribute_values av
-                JOIN product_attribute_values pav ON pav.attribute_value_id = av.id
-                WHERE av.attribute_id = ? AND pav.product_id = ? ORDER BY av.value ASC
-            """, [attr["id"], product_id])
-            if not attr["options"]:
-                attr["options"] = db.query(
-                    "SELECT * FROM attribute_values WHERE attribute_id = ? ORDER BY value ASC", [attr["id"]]
+        if linked_attributes:
+            attr_ids     = [a["id"] for a in linked_attributes]
+            placeholders = ",".join(["?"] * len(attr_ids))
+
+            selected_rows = db.query(
+                f"""SELECT av.* FROM attribute_values av
+                    JOIN product_attribute_values pav ON pav.attribute_value_id = av.id
+                    WHERE av.attribute_id IN ({placeholders}) AND pav.product_id = ? ORDER BY av.value ASC""",
+                attr_ids + [product_id]
+            )
+            selected_by_attr = {}
+            for row in selected_rows:
+                selected_by_attr.setdefault(str(row["attribute_id"]), []).append(row)
+
+            fallback_ids = [a["id"] for a in linked_attributes if not selected_by_attr.get(str(a["id"]))]
+            fallback_by_attr = {}
+            if fallback_ids:
+                fb_placeholders = ",".join(["?"] * len(fallback_ids))
+                fallback_rows = db.query(
+                    f"SELECT * FROM attribute_values WHERE attribute_id IN ({fb_placeholders}) ORDER BY value ASC",
+                    fallback_ids
                 )
+                for row in fallback_rows:
+                    fallback_by_attr.setdefault(str(row["attribute_id"]), []).append(row)
+
+            for attr in linked_attributes:
+                aid = str(attr["id"])
+                attr["options"] = selected_by_attr.get(aid) or fallback_by_attr.get(aid, [])
         return render_template(
             "admin/variations.html", product=product, variations=variations, attributes=linked_attributes
         )
@@ -847,16 +976,17 @@ def register(app):
                 (product or {}).get("sku")
             )
             var_id = str(uuid.uuid4())
-            db.execute(
-                "INSERT INTO product_variations (id, product_id, sku, price, sale_price, stock_quantity) "
-                "VALUES (?,?,?,?,?,?)",
-                [var_id, product_id, variation_sku,
-                 float(product.get("sale_price") or product.get("price") or 0), None,
-                 int(product.get("stock_quantity") or 0)]
-            )
-            for key, val_id in f.items():
-                if key.startswith("attr_") and val_id:
-                    db.execute(
+            attr_value_ids = [val_id for key, val_id in f.items() if key.startswith("attr_") and val_id]
+            with db.transaction() as tx:
+                tx.execute(
+                    "INSERT INTO product_variations (id, product_id, sku, price, sale_price, stock_quantity) "
+                    "VALUES (?,?,?,?,?,?)",
+                    [var_id, product_id, variation_sku,
+                     float(product.get("sale_price") or product.get("price") or 0), None,
+                     int(product.get("stock_quantity") or 0)]
+                )
+                for val_id in attr_value_ids:
+                    tx.execute(
                         "INSERT INTO variation_attribute_values (id, variation_id, attribute_value_id) VALUES (?,?,?)",
                         [str(uuid.uuid4()), var_id, val_id]
                     )
@@ -871,8 +1001,9 @@ def register(app):
         product_id = request.form.get("product_id")
         try:
             # Cascade: remove attribute value links first to avoid orphaned rows
-            db.execute("DELETE FROM variation_attribute_values WHERE variation_id = ?", [var_id])
-            db.execute("DELETE FROM product_variations WHERE id = ?", [var_id])
+            with db.transaction() as tx:
+                tx.execute("DELETE FROM variation_attribute_values WHERE variation_id = ?", [var_id])
+                tx.execute("DELETE FROM product_variations WHERE id = ?", [var_id])
             flash("Variation deleted", "success")
         except Exception as e:
             flash(f"Error: {e}", "error")
@@ -889,15 +1020,27 @@ def register(app):
             # First, fetch all variation IDs for this product to validate
             rows = db.query("SELECT id FROM product_variations WHERE product_id = ?", [product_id])
             var_ids = [r["id"] for r in rows]
-            
-            for vid in var_ids:
-                sku = (request.form.get(f"sku_{vid}") or "").strip()
-                final_sku = sku or generate_unique_variation_sku(base_sku, exclude_id=vid)
-                
-                db.execute(
-                    "UPDATE product_variations SET sku=?, price=?, sale_price=?, stock_quantity=? WHERE id=?",
-                    [final_sku, base_price, None, base_stock, vid]
-                )
+
+            if var_ids:
+                final_skus = {}
+                for vid in var_ids:
+                    sku = (request.form.get(f"sku_{vid}") or "").strip()
+                    final_skus[vid] = sku or generate_unique_variation_sku(base_sku, exclude_id=vid)
+
+                with db.transaction() as tx:
+                    # price/sale_price/stock are identical for every variation of this
+                    # product, so a single UPDATE covers all rows at once.
+                    tx.execute(
+                        "UPDATE product_variations SET price=?, sale_price=?, stock_quantity=? WHERE product_id=?",
+                        [base_price, None, base_stock, product_id]
+                    )
+                    case_sql = " ".join(["WHEN ? THEN ?"] * len(var_ids))
+                    case_params = [part for vid in var_ids for part in (vid, final_skus[vid])]
+                    placeholders = ",".join(["?"] * len(var_ids))
+                    tx.execute(
+                        f"UPDATE product_variations SET sku = CASE id {case_sql} END WHERE id IN ({placeholders})",
+                        case_params + var_ids
+                    )
             flash("All variations updated successfully.", "success")
         except Exception as e:
             flash(f"Error during bulk update: {e}", "error")
@@ -910,11 +1053,19 @@ def register(app):
     def admin_lenses():
         try:
             types = db.query("SELECT * FROM lens_types ORDER BY display_order ASC, name ASC")
-            for t in types:
-                t["options"] = db.query(
-                    "SELECT * FROM lens_options WHERE lens_type_id = ? ORDER BY display_order ASC, name ASC",
-                    [t["id"]]
+            if types:
+                type_ids     = [t["id"] for t in types]
+                placeholders = ",".join(["?"] * len(type_ids))
+                all_options  = db.query(
+                    f"SELECT * FROM lens_options WHERE lens_type_id IN ({placeholders}) "
+                    f"ORDER BY display_order ASC, name ASC",
+                    type_ids,
                 )
+                options_by_type = {}
+                for opt in all_options:
+                    options_by_type.setdefault(str(opt["lens_type_id"]), []).append(opt)
+                for t in types:
+                    t["options"] = options_by_type.get(str(t["id"]), [])
         except Exception as e:
             types = []
             flash(f"Error: {e}", "error")
@@ -1072,19 +1223,31 @@ def register(app):
     @app.route("/admin/reviews")
     @require_admin
     def admin_reviews():
+        import math
+        try:
+            page = max(1, int(request.args.get("page", 1)))
+        except (ValueError, TypeError):
+            page = 1
+        per_page = 20
+        offset   = (page - 1) * per_page
         try:
             reviews = db.query("""
                 SELECT r.*, r.body AS comment, p.name AS product_name, p.id AS product_id,
                        (u.first_name || ' ' || u.last_name) AS reviewer_name
-                FROM product_reviews r 
+                FROM product_reviews r
                 LEFT JOIN products p ON p.id = r.product_id
                 LEFT JOIN users u ON u.id = r.user_id
                 ORDER BY r.created_at DESC
-            """)
+                LIMIT ? OFFSET ?
+            """, [per_page, offset])
+            total       = (db.query_one("SELECT COUNT(*) AS cnt FROM product_reviews") or {}).get("cnt", 0)
+            total_pages = max(1, math.ceil(total / per_page))
         except Exception as e:
-            reviews = []
+            reviews, total, total_pages = [], 0, 1
             flash(f"Error loading reviews: {e}", "error")
-        return render_template("admin/reviews.html", reviews=reviews)
+        return render_template(
+            "admin/reviews.html", reviews=reviews, total=total, total_pages=total_pages, page=page
+        )
 
     @app.route("/admin/reviews/<review_id>/approve", methods=["POST"])
     @require_admin
@@ -1164,16 +1327,28 @@ def register(app):
     @app.route("/admin/coupons")
     @require_admin
     def admin_coupons():
+        import math
+        try:
+            page = max(1, int(request.args.get("page", 1)))
+        except (ValueError, TypeError):
+            page = 1
+        per_page = 20
+        offset   = (page - 1) * per_page
         try:
             coupons = db.query("""
                 SELECT c.*, (SELECT COUNT(*) FROM coupon_usages WHERE coupon_id = c.id) as used_count
-                FROM coupons c 
+                FROM coupons c
                 ORDER BY c.created_at DESC
-            """)
+                LIMIT ? OFFSET ?
+            """, [per_page, offset])
+            total       = (db.query_one("SELECT COUNT(*) AS cnt FROM coupons") or {}).get("cnt", 0)
+            total_pages = max(1, math.ceil(total / per_page))
         except Exception as e:
-            coupons = []
+            coupons, total, total_pages = [], 0, 1
             flash(f"Error loading coupons: {e}", "error")
-        return render_template("admin/coupons.html", coupons=coupons)
+        return render_template(
+            "admin/coupons.html", coupons=coupons, total=total, total_pages=total_pages, page=page
+        )
 
     @app.route("/admin/coupons/new", methods=["GET", "POST"])
     @require_admin
@@ -1207,8 +1382,9 @@ def register(app):
     def admin_coupon_delete(coupon_id):
         try:
             # Remove usage records first to avoid orphaned rows
-            db.execute("DELETE FROM coupon_usages WHERE coupon_id=?", [coupon_id])
-            db.execute("DELETE FROM coupons WHERE id=?", [coupon_id])
+            with db.transaction() as tx:
+                tx.execute("DELETE FROM coupon_usages WHERE coupon_id=?", [coupon_id])
+                tx.execute("DELETE FROM coupons WHERE id=?", [coupon_id])
             flash("Coupon deleted successfully.", "success")
         except Exception as e:
             flash(f"Error deleting coupon: {e}", "error")
@@ -1230,10 +1406,19 @@ def register(app):
                 reader   = csv.DictReader(io.StringIO(content))
                 imported = skipped = 0
                 errors   = []
+
+                # Pass 1: parse & validate every row up front, collecting the
+                # sku/slug candidates so duplicates can be checked in ONE query
+                # instead of one SELECT per row.
+                parsed_rows = []
+                candidate_skus, candidate_slugs = [], []
                 for i, row in enumerate(reader, 1):
                     try:
-                        name  = (row.get("post_title") or row.get("name") or "").strip()
-                        sku   = (row.get("sku") or "").strip() or generate_unique_product_sku(name)
+                        name = (row.get("post_title") or row.get("name") or "").strip()
+                        if not name:
+                            skipped += 1
+                            continue
+                        sku_input = (row.get("sku") or "").strip()
                         price = float(row.get("regular_price") or row.get("price") or 0)
                         sale  = float(row.get("sale_price") or 0) or None
                         stock = int(row.get("stock") or row.get("stock_quantity") or 0)
@@ -1241,31 +1426,62 @@ def register(app):
                         short = (row.get("short_description") or row.get("post_excerpt") or "").strip()
                         img   = (row.get("images") or row.get("image") or "").strip().split("|")[0].strip()
                         slug  = (row.get("post_name") or row.get("slug") or name.lower().replace(" ", "-")).strip()
-                        if not name:
-                            skipped += 1
-                            continue
-                        if db.query_one("SELECT id FROM products WHERE sku=? OR slug=?", [sku, slug]):
-                            skipped += 1
-                            continue
-                        pid = str(uuid.uuid4())
-                        db.execute(
-                            """INSERT INTO products (id, name, slug, sku, price, sale_price,
-                               stock_quantity, stock_status, description, short_description, is_active)
-                               VALUES (?,?,?,?,?,?,?,?,?,?,1)""",
-                            [pid, name, slug, sku, price, sale, stock,
-                             "in_stock" if stock > 0 else "out_of_stock", desc, short]
-                        )
-                        result = {"id": pid}
-                        if result and img:
-                            mid = str(uuid.uuid4())
-                            db.execute("INSERT INTO media (id, file_url) VALUES (?,?)", [mid, img])
-                            db.execute(
-                                "INSERT INTO product_images (id, product_id, media_id, is_primary) VALUES (?,?,?,1)",
-                                [str(uuid.uuid4()), result["id"], mid]
-                            )
-                        imported += 1
+                        parsed_rows.append({
+                            "i": i, "name": name, "sku_input": sku_input, "price": price,
+                            "sale": sale, "stock": stock, "desc": desc, "short": short,
+                            "img": img, "slug": slug,
+                        })
+                        if sku_input:
+                            candidate_skus.append(sku_input)
+                        candidate_slugs.append(slug)
                     except Exception as row_err:
                         errors.append(f"Row {i}: {row_err}")
+
+                existing_skus, existing_slugs = set(), set()
+                if candidate_skus or candidate_slugs:
+                    dupe_rows = db.query(
+                        "SELECT sku, slug FROM products WHERE sku = ANY(?) OR slug = ANY(?)",
+                        [candidate_skus or [""], candidate_slugs or [""]]
+                    )
+                    existing_skus  = {r["sku"] for r in dupe_rows if r["sku"]}
+                    existing_slugs = {r["slug"] for r in dupe_rows if r["slug"]}
+
+                # Pass 2: insert. Each row's writes are wrapped in their own
+                # transaction so a mid-row failure can't leave an orphaned
+                # product without its image, while keeping row failures
+                # isolated from each other (one bad row doesn't sink the batch).
+                seen_skus, seen_slugs = set(), set()
+                for r in parsed_rows:
+                    try:
+                        sku  = r["sku_input"] or generate_unique_product_sku(r["name"])
+                        slug = r["slug"]
+                        if (sku in existing_skus or sku in seen_skus or
+                                slug in existing_slugs or slug in seen_slugs):
+                            skipped += 1
+                            continue
+
+                        pid = str(uuid.uuid4())
+                        with db.transaction() as tx:
+                            tx.execute(
+                                """INSERT INTO products (id, name, slug, sku, price, sale_price,
+                                   stock_quantity, stock_status, description, short_description, is_active)
+                                   VALUES (?,?,?,?,?,?,?,?,?,?,1)""",
+                                [pid, r["name"], slug, sku, r["price"], r["sale"], r["stock"],
+                                 "in_stock" if r["stock"] > 0 else "out_of_stock", r["desc"], r["short"]]
+                            )
+                            if r["img"]:
+                                mid = str(uuid.uuid4())
+                                tx.execute("INSERT INTO media (id, file_url) VALUES (?,?)", [mid, r["img"]])
+                                tx.execute(
+                                    "INSERT INTO product_images (id, product_id, media_id, is_primary) VALUES (?,?,?,1)",
+                                    [str(uuid.uuid4()), pid, mid]
+                                )
+                        seen_skus.add(sku)
+                        seen_slugs.add(slug)
+                        imported += 1
+                    except Exception as row_err:
+                        errors.append(f"Row {r['i']}: {row_err}")
+
                 results = {"imported": imported, "skipped": skipped, "errors": errors}
                 if imported > 0:
                     get_products.cache_clear()
