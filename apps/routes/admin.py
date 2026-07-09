@@ -402,10 +402,24 @@ def register(app):
     @require_admin
     def admin_product_image_delete(product_id, image_id):
         try:
-            db.execute(
-                "DELETE FROM product_images WHERE id=? AND product_id=?",
-                [image_id, product_id]
-            )
+            with db.transaction() as tx:
+                deleted = tx.query_one(
+                    "SELECT is_primary FROM product_images WHERE id=? AND product_id=?",
+                    [image_id, product_id]
+                )
+                tx.execute(
+                    "DELETE FROM product_images WHERE id=? AND product_id=?",
+                    [image_id, product_id]
+                )
+                # If the primary image was removed, promote another remaining
+                # image so the product always has a primary while any exist.
+                if deleted and deleted.get("is_primary"):
+                    next_image = tx.query_one(
+                        "SELECT id FROM product_images WHERE product_id=? ORDER BY display_order ASC LIMIT 1",
+                        [product_id]
+                    )
+                    if next_image:
+                        tx.execute("UPDATE product_images SET is_primary=1 WHERE id=?", [next_image["id"]])
             get_products.cache_clear()
             get_homepage_products.cache_clear()
             get_product_detail.cache_clear()
