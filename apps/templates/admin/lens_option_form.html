@@ -23,7 +23,7 @@
     <input type="text" name="name" value="{{ option.name if option else '' }}" placeholder="e.g. Blue Cut 1.60 Essential, Photochromic" required class="admin-input" style="background:#fff;" />
   </div>
 
-  <div style="display:grid; grid-template-columns:1fr 1fr; gap:2rem; margin-bottom:2rem;">
+  <div class="admin-form-grid-2" style="gap:2rem; margin-bottom:2rem;">
     <div>
       <label class="admin-label">Price Modifier (₹) *</label>
       <input type="number" name="price_modifier" step="0.01" min="0" value="{{ option.price_modifier if option else '0.00' }}" required class="admin-input" style="background:#fff;" />

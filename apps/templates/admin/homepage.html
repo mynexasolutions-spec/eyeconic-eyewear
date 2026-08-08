@@ -1,0 +1,192 @@
+{% extends "admin/base.html" %}
+{% block title %}Home Page – StoreAdmin{% endblock %}
+
+{% block content %}
+<div class="admin-page-header">
+  <div>
+    <h1 style="font-size:1.5rem; font-weight:700; color:var(--admin-text-main); margin-bottom:0.25rem;">Home Page</h1>
+    <p style="color:var(--admin-text-muted); font-size:0.875rem;">Manage every section of your storefront home page — hero slides, category tiles, shop-by-shape, product carousels (built-in and custom), trust stats, the lifestyle banner, testimonials and the Instagram grid. Each card below has its own Live/Hidden switch to take down the whole section at once.</p>
+  </div>
+  <a href="{{ url_for('public.index') }}" target="_blank" class="admin-btn btn-outline">View Live Page</a>
+</div>
+
+{% set section_meta = {
+  'hero':        {'label': 'Hero Slides', 'desc': 'The rotating banner at the very top of the home page.', 'add': '+ Add Slide'},
+  'category':    {'label': 'Shop by Category', 'desc': 'The Men / Women / Kids tiles ("Find Your Perfect Pair").', 'add': '+ Add Category Tile'},
+  'carousel':    {'label': 'Product Carousels', 'desc': "Every product carousel on the home page lives here — Best Sellers, Men's, Women's, Kids', Premium Accessories, Sunglasses and Eyeglasses, plus any brand new ones you add. Rename them, reorder their products, hide them, or add a fresh one with any name (e.g. \"Premium Glasses\").", 'add': '+ Add Carousel'},
+  'banner':      {'label': 'Lifestyle Banner', 'desc': 'The single full-width banner below the product carousels.', 'add': '+ Add Banner'},
+  'stat':        {'label': 'Trust Stats', 'desc': 'The small stat strip (e.g. "50K+ Happy Customers").', 'add': '+ Add Stat'},
+  'testimonial': {'label': 'Testimonials', 'desc': 'Customer review cards shown in the auto-scrolling marquee.', 'add': '+ Add Testimonial'},
+  'instagram':   {'label': 'Instagram Gallery', 'desc': 'The 4-tile community photo grid near the footer.', 'add': '+ Add Photo'},
+} %}
+
+{% macro section_card(stype) %}
+{% set meta = section_meta[stype] %}
+{% set items = sections[stype] %}
+<div class="admin-card" style="margin-bottom:1.5rem;">
+  <div class="admin-page-header" style="margin-bottom:1.25rem;">
+    <div>
+      <h2 style="font-size:1.0625rem; font-weight:700; margin-bottom:0.2rem;">{{ meta.label }}</h2>
+      <p style="color:var(--admin-text-muted); font-size:0.8125rem;">{{ meta.desc }}</p>
+    </div>
+    <div style="display:flex; gap:0.5rem; align-items:center;">
+      <form action="{{ url_for('admin_homepage_section_toggle', stype=stype) }}" method="post" style="margin:0;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <button type="submit" 
+                style="border: 1px solid currentColor; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.4rem 0.85rem; font-size: 0.75rem; font-weight: 700; border-radius: 9999px; transition: all 0.2s ease; outline: none; background-color: {% if section_visible[stype] %}#d1fae5{% else %}#fee2e2{% endif %}; color: {% if section_visible[stype] %}#047857{% else %}#b91c1c{% endif %}; text-transform: uppercase; letter-spacing: 0.05em;" 
+                title="Click to toggle: Show or hide this entire section on the home page"
+                onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 2px 8px rgba(0,0,0,0.06)';"
+                onmouseout="this.style.transform='none'; this.style.boxShadow='none';">
+          <span style="width: 6px; height: 6px; border-radius: 99px; display: inline-block; background-color: currentColor; animation: pulse 2s infinite;"></span>
+          {{ 'Section Live' if section_visible[stype] else 'Section Hidden' }}
+        </button>
+      </form>
+      <a href="{{ url_for('admin_homepage_new', section_type=stype) }}" class="admin-btn btn-primary">{{ meta.add }}</a>
+    </div>
+  </div>
+
+  <div class="admin-table-container">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          {% if stype not in ('stat', 'carousel') %}<th style="width:64px;">Image</th>{% endif %}
+          {% if stype == 'stat' %}
+          <th>Value</th><th>Label</th>
+          {% elif stype == 'testimonial' %}
+          <th>Name</th><th>City</th><th>Rating</th>
+          {% elif stype in ('instagram', 'category') %}
+          <th>{{ 'Name' if stype == 'category' else 'Alt Text' }}</th><th>Link</th>
+          {% elif stype == 'carousel' %}
+          <th>Title</th><th>Products</th>
+          {% else %}
+          <th>Title</th><th>Subtitle</th>
+          {% endif %}
+          <th style="width:90px;">Order</th>
+          <th style="width:80px;">Active</th>
+          <th style="text-align:right; width:{{ '250px' if stype == 'carousel' else '170px' }};">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for it in items %}
+        <tr>
+          {% if stype not in ('stat', 'carousel') %}
+          <td>
+            <div style="width:44px; height:44px; border-radius:8px; overflow:hidden; border:1px solid var(--admin-border); background:#f8fafc;">
+              <img src="{{ resolve_image(it.image_url) }}" alt="" style="width:100%; height:100%; object-fit:cover;" onerror="this.style.visibility='hidden'">
+            </div>
+          </td>
+          {% endif %}
+          {% if stype == 'stat' %}
+          <td style="font-weight:700;">{{ it.title }}</td>
+          <td>{{ it.subtitle }}</td>
+          {% elif stype == 'testimonial' %}
+          <td style="font-weight:600;">{{ it.title }}</td>
+          <td>{{ it.subtitle }}</td>
+          <td>{{ '★' * (it.rating or 5) }}</td>
+          {% elif stype == 'instagram' %}
+          <td>{{ it.title or '—' }}</td>
+          <td style="color:var(--admin-text-muted); font-size:0.8125rem;">{{ it.link_url or '—' }}</td>
+          {% elif stype == 'category' %}
+          <td style="font-weight:600;">{{ it.title }}</td>
+          <td style="color:var(--admin-text-muted); font-size:0.8125rem;">{{ it.cta_link or '—' }}</td>
+          {% elif stype == 'carousel' %}
+          <td style="font-weight:600;">
+            {{ it.title }}
+            {% if it.is_builtin %}<span class="badge" style="background:#eef2ff; color:#4338ca; font-weight:600; margin-left:0.4rem; font-size:0.7rem;" title="One of the original home page sections. You can hide it with the toggle, or delete it for good.">Built-in</span>{% endif %}
+          </td>
+          <td>
+            {% if it.product_count > 0 %}
+            <span class="badge badge-processing">{{ it.product_count }} product{{ 's' if it.product_count != 1 }}</span>
+            {% elif it.is_builtin %}
+            <span class="badge" style="background:#f1f5f9; color:#64748b;">Automatic</span>
+            {% else %}
+            <span class="badge" style="background:#fef3c7; color:#92400e;">No products yet</span>
+            {% endif %}
+          </td>
+          {% else %}
+          <td style="font-weight:600;">{{ it.title }}</td>
+          <td>{{ it.subtitle }}</td>
+          {% endif %}
+          <td>
+            {% if it.is_builtin %}
+            <span style="color:var(--admin-text-muted); font-size:0.75rem;" title="Built-in sections keep their fixed position on the page.">Fixed</span>
+            {% else %}
+            <div style="display:flex; gap:0.25rem;">
+              <form action="{{ url_for('admin_homepage_move', item_id=it.id, direction='up') }}" method="post" style="margin:0;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                <button type="submit" class="admin-btn btn-outline" style="padding:0.25rem 0.5rem; font-size:0.75rem;" {% if loop.first %}disabled{% endif %}>&#8593;</button>
+              </form>
+              <form action="{{ url_for('admin_homepage_move', item_id=it.id, direction='down') }}" method="post" style="margin:0;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                <button type="submit" class="admin-btn btn-outline" style="padding:0.25rem 0.5rem; font-size:0.75rem;" {% if loop.last %}disabled{% endif %}>&#8595;</button>
+              </form>
+            </div>
+            {% endif %}
+          </td>
+          <td>
+            <form action="{{ url_for('admin_homepage_toggle', item_id=it.id) }}" method="post" style="margin:0;">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+              <button type="submit" class="badge {% if it.is_active %}badge-delivered{% else %}badge-cancelled{% endif %}" style="border:none; cursor:pointer;">{{ 'Live' if it.is_active else 'Hidden' }}</button>
+            </form>
+          </td>
+          <td style="text-align:right; display:flex; justify-content:flex-end; gap:0.5rem;">
+            {% if stype == 'carousel' %}
+            <a href="{{ url_for('admin_homepage_products', section_key=it.id) }}" class="admin-btn btn-outline" style="padding:0.375rem 0.75rem; font-size:0.8125rem;">Products</a>
+            {% endif %}
+            <a href="{{ url_for('admin_homepage_edit', item_id=it.id) }}" class="admin-btn btn-outline" style="padding:0.375rem 0.75rem; font-size:0.8125rem;">Edit</a>
+            <form action="{{ url_for('admin_homepage_delete', item_id=it.id) }}" method="post" style="margin:0;"
+                  onsubmit="return confirm('{{ 'This is a built-in section — deleting it removes it from the home page for good, it will not come back automatically. Delete anyway?' if it.is_builtin else 'Delete this item? This cannot be undone.' }}')">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+              <button type="submit" class="admin-btn" style="padding:0.375rem 0.75rem; font-size:0.8125rem; color:#ef4444; background:rgba(239,68,68,0.05); border:none;">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="{{ 5 if stype in ('stat', 'carousel') else 6 }}" style="text-align:center; padding:2rem; color:var(--admin-text-muted);">Nothing here yet. {{ meta.add }} to get started.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endmacro %}
+
+{{ section_card('hero') }}
+{{ section_card('category') }}
+
+<!-- SHOP BY SHAPE -->
+<div class="admin-card" style="margin-bottom:1.5rem;">
+  <h2 style="font-size:1.0625rem; font-weight:700; margin-bottom:0.2rem;">Shop by Shape</h2>
+  <p style="color:var(--admin-text-muted); font-size:0.8125rem; margin-bottom:1.25rem;">The frame-shape browsing section near the top of the home page. Rename its heading, or hide it without losing your setup.</p>
+  {% if shape_section %}
+  <div class="admin-table-container">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Heading</th>
+          <th style="width:80px;">Active</th>
+          <th style="text-align:right; width:170px;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="font-weight:600;">{{ shape_section.title }}</td>
+          <td>
+            <form action="{{ url_for('admin_homepage_toggle', item_id=shape_section.id) }}" method="post" style="margin:0;">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+              <button type="submit" class="badge {% if shape_section.is_active %}badge-delivered{% else %}badge-cancelled{% endif %}" style="border:none; cursor:pointer;">{{ 'Live' if shape_section.is_active else 'Hidden' }}</button>
+            </form>
+          </td>
+          <td style="text-align:right;">
+            <a href="{{ url_for('admin_homepage_edit', item_id=shape_section.id) }}" class="admin-btn btn-outline" style="padding:0.375rem 0.75rem; font-size:0.8125rem;">Edit</a>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+
+{% for stype in ['carousel', 'banner', 'stat', 'testimonial', 'instagram'] %}
+{{ section_card(stype) }}
+{% endfor %}
+{% endblock %}

@@ -2,6 +2,7 @@
 app.py — Application factory for ChasmaGallery.
 """
 import os
+import uuid
 from flask import Flask, render_template, session, request
 from flask_compress import Compress
 from dotenv import load_dotenv
@@ -96,6 +97,175 @@ def create_app():
 
 
 app = create_app()
+
+
+def _ensure_home_sections_table():
+    """Create + seed the home_sections table. Runs unconditionally on every process
+    boot (not gated behind WERKZEUG_RUN_MAIN) so it always executes in whichever
+    process ends up serving requests — including under the dev reloader and
+    serverless cold starts."""
+    try:
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS home_sections (
+                id           TEXT PRIMARY KEY DEFAULT lower(encode(gen_random_bytes(16), 'hex')),
+                section_type TEXT NOT NULL,
+                title        TEXT DEFAULT '',
+                subtitle     TEXT DEFAULT '',
+                body         TEXT DEFAULT '',
+                badge_text   TEXT DEFAULT '',
+                image_url    TEXT DEFAULT '',
+                link_url     TEXT DEFAULT '',
+                cta_text     TEXT DEFAULT '',
+                cta_link     TEXT DEFAULT '',
+                cta2_text    TEXT DEFAULT '',
+                cta2_link    TEXT DEFAULT '',
+                rating       INTEGER DEFAULT 5,
+                sort_order   INTEGER DEFAULT 0,
+                is_active    INTEGER DEFAULT 1,
+                created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_home_sections_type "
+            "ON home_sections(section_type, is_active, sort_order)"
+        )
+        def _count(section_type):
+            row = db.query_one(
+                "SELECT COUNT(*) as count FROM home_sections WHERE section_type=?",
+                [section_type]
+            )
+            return row.get("count", 0) if row else 0
+
+        if _count("hero") == 0:
+            hero_slides = [
+                ("New Collection 2025", "See The World", "Differently",
+                 "Premium eyewear crafted for those who refuse to blend in. Handcrafted frames that define your identity.",
+                 "https://images.unsplash.com/photo-1526045612212-70caf35c14df?w=1600&q=85&auto=format&fit=crop",
+                 "Shop Now", "/shop", "Explore Collection", "/shop"),
+                ("Accessories Collection", "Complete Your", "Look",
+                 "Premium lens cleaners, microfiber cloths, and contact solutions to keep your vision crystal clear.",
+                 "https://images.unsplash.com/photo-1604537529428-15bcbeecfe4d?w=1600&q=85&auto=format&fit=crop",
+                 "Shop Accessories", "/shop?category=accessories", "Learn More", "/shop"),
+                ("Exclusive Sale — Up to 50% Off", "Style For", "Every Face",
+                 "From classic round frames to bold wayfarers — discover the perfect pair that speaks to your soul.",
+                 "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=1600&q=85&auto=format&fit=crop",
+                 "Shop Sale", "/shop?on_sale=1", "All Collections", "/shop"),
+            ]
+            for i, (badge, title, subtitle, body, image_url, cta_text, cta_link, cta2_text, cta2_link) in enumerate(hero_slides):
+                db.execute(
+                    "INSERT INTO home_sections (id, section_type, badge_text, title, subtitle, body, "
+                    "image_url, cta_text, cta_link, cta2_text, cta2_link, sort_order) "
+                    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                    [str(uuid.uuid4()), "hero", badge, title, subtitle, body, image_url,
+                     cta_text, cta_link, cta2_text, cta2_link, i]
+                )
+
+            print("[db.migrate] Seeded default hero slides.")
+
+        if _count("category") == 0:
+            category_tiles = [
+                ("Men", "man.webp", "/shop?category=men"),
+                ("Women", "woman.webp", "/shop?category=women"),
+                ("Kids", "kid.webp", "/shop?category=kids"),
+            ]
+            for i, (name, image_url, link) in enumerate(category_tiles):
+                db.execute(
+                    "INSERT INTO home_sections (id, section_type, title, image_url, cta_text, cta_link, sort_order) "
+                    "VALUES (?,?,?,?,?,?,?)",
+                    [str(uuid.uuid4()), "category", name, image_url, "Explore Now", link, i]
+                )
+            print("[db.migrate] Seeded default category tiles.")
+
+        if _count("stat") == 0:
+            stats = [
+                ("50K+", "Happy Customers"), ("4.8/5", "Average Rating"),
+                ("100+", "Premium Styles"), ("20+", "Cities Delivered"),
+                ("99%", "Satisfaction Rate"),
+            ]
+            for i, (value, label) in enumerate(stats):
+                db.execute(
+                    "INSERT INTO home_sections (id, section_type, title, subtitle, sort_order) "
+                    "VALUES (?,?,?,?,?)",
+                    [str(uuid.uuid4()), "stat", value, label, i]
+                )
+            print("[db.migrate] Seeded default trust stats.")
+
+        if _count("banner") == 0:
+            db.execute(
+                "INSERT INTO home_sections (id, section_type, badge_text, title, subtitle, body, "
+                "image_url, cta_text, cta_link, sort_order) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                [str(uuid.uuid4()), "banner", "Made For Every Moment", "Style That Fits", "Every You",
+                 "From workdays to weekends, find eyewear that matches your vibe, your energy, your world.",
+                 "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=1600&q=85&auto=format&fit=crop",
+                 "Explore Collection", "/shop", 0]
+            )
+            print("[db.migrate] Seeded default lifestyle banner.")
+
+        if _count("testimonial") == 0:
+            testimonials = [
+                ("Rohit Sharma", "Mumbai", "The quality is outstanding and so comfortable to wear all day. These frames have completely replaced all my old glasses. Highly recommended!"),
+                ("Ananya Verma", "Delhi", "Stylish, lightweight and great packaging. My go-to eyewear brand now. The blue light glasses really help with my screen time."),
+                ("Karan Mehta", "Bengaluru", "Fast delivery, premium packaging and amazing product quality. The aviator frames look exactly like the photos. Will buy again!"),
+                ("Neha Kapoor", "Pune", "Finally found blue light glasses that actually work and look good! I wear them every day and my eye strain has reduced so much."),
+                ("Priya Rao", "Hyderabad", "Absolutely love the cat-eye frames! Got so many compliments. The packaging was beautiful and delivery was super fast."),
+                ("Arjun Kumar", "Chennai", "Best purchase this year. The sunglasses are premium quality and the polarised lenses are incredible. Worth every rupee!"),
+                ("Sunita Mehta", "Jaipur", "Ordered the kids frames for my daughter and she absolutely loves them! Sturdy, flexible and so cute. Great for school."),
+            ]
+            for i, (name, city, text) in enumerate(testimonials):
+                db.execute(
+                    "INSERT INTO home_sections (id, section_type, title, subtitle, body, rating, sort_order) "
+                    "VALUES (?,?,?,?,?,?,?)",
+                    [str(uuid.uuid4()), "testimonial", name, city, text, 5, i]
+                )
+            print("[db.migrate] Seeded default testimonials.")
+
+        if _count("instagram") == 0:
+            for i in range(1, 5):
+                db.execute(
+                    "INSERT INTO home_sections (id, section_type, image_url, sort_order) VALUES (?,?,?,?)",
+                    [str(uuid.uuid4()), "instagram", f"{i}.webp", i - 1]
+                )
+            print("[db.migrate] Seeded default instagram tiles.")
+    except Exception as _e:
+        print(f"[db.migrate] Error setting up home_sections: {_e}")
+
+
+def _ensure_home_product_picks_table():
+    """Curated per-section product lists for the home page carousels (Best Sellers,
+    Men's/Women's/Kids' Eyewear, Accessories, Sunglasses, Eyeglasses). An empty table
+    for a given section_key means that section still falls back to its automatic
+    category/featured-based selection."""
+    try:
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS home_product_picks (
+                id          TEXT PRIMARY KEY DEFAULT lower(encode(gen_random_bytes(16), 'hex')),
+                section_key TEXT NOT NULL,
+                product_id  TEXT NOT NULL,
+                sort_order  INTEGER DEFAULT 0,
+                created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_home_product_picks_section "
+            "ON home_product_picks(section_key, sort_order)"
+        )
+    except Exception as _e:
+        print(f"[db.migrate] Error setting up home_product_picks: {_e}")
+
+
+def _ensure_shipping_columns():
+    """Add iThink Logistics shipment columns to orders if they're missing.
+    Runs unconditionally on every boot, same as the home page tables above."""
+    try:
+        for col in ("awb_number", "shipment_courier", "shipment_tracking_url"):
+            db.execute(f"ALTER TABLE orders ADD COLUMN IF NOT EXISTS {col} TEXT DEFAULT ''")
+    except Exception as _e:
+        print(f"[db.migrate] Error setting up shipping columns: {_e}")
+
+
+_ensure_home_sections_table()
+_ensure_home_product_picks_table()
+_ensure_shipping_columns()
 
 import os as _os
 if _os.environ.get("WERKZEUG_RUN_MAIN") != "true":

@@ -1,7 +1,7 @@
 import math
 import datetime as _dt
 import db
-from helpers import ttl_cache
+from helpers import ttl_cache, get_cached_store_settings
 
 _EPOCH = _dt.datetime.min
 
@@ -71,7 +71,7 @@ def get_products(search=None, categories=(), brands=(), shape=None,
     params     = []
 
     if search:
-        conditions.append("(p.name LIKE ? OR p.sku LIKE ? OR p.description LIKE ?)")
+        conditions.append("(p.name ILIKE ? OR p.sku ILIKE ? OR p.description ILIKE ?)")
         params += [f"%{search}%", f"%{search}%", f"%{search}%"]
     if cats:
         ph = ",".join(["?"] * len(cats))
@@ -193,6 +193,143 @@ def get_featured_categories():
         WHERE parent_id IS NULL
         ORDER BY name ASC
     """) or []
+
+
+@ttl_cache(ttl_seconds=120)
+def get_home_sections(section_type):
+    """Active homepage content blocks of one type, in display order. Public-facing (cached)."""
+    return db.query(
+        "SELECT * FROM home_sections WHERE section_type=? AND is_active=1 "
+        "ORDER BY sort_order ASC, created_at ASC",
+        [section_type]
+    ) or []
+
+
+# The 7 product carousels that used to be hardcoded, fixed home page sections.
+# They're seeded as real home_sections rows (id = their section key) so admins
+# manage them from the same Product Carousels table as any custom carousel —
+# same rename/reorder-within-picks/hide/products flow, no separate concept.
+HOME_BUILTIN_CAROUSEL_DEFAULTS = {
+    "bestsellers": {"title": "Best Sellers", "badge_text": "Top Picks",
+                     "cta_text": "View All Best Sellers", "cta_link": "/shop?featured=1", "sort_order": 0},
+    "men":         {"title": "Men's Eyewear", "badge_text": "For Him",
+                     "cta_text": "View All Men's", "cta_link": "/shop?category=eyeglasses-men&category=sunglasses-men", "sort_order": 1},
+    "women":       {"title": "Women's Eyewear", "badge_text": "For Her",
+                     "cta_text": "View All Women's", "cta_link": "/shop?category=eyeglasses-women&category=sunglasses-women", "sort_order": 2},
+    "kids":        {"title": "Kids' Eyewear", "badge_text": "For Little Ones",
+                     "cta_text": "View All Kids'", "cta_link": "/shop?category=eyeglasses-kids&category=sunglasses-kids", "sort_order": 3},
+    "accessories": {"title": "Premium Accessories", "badge_text": "Essential Care",
+                     "cta_text": "View All", "cta_link": "/shop?category=accessories", "sort_order": 4},
+    "sunglasses":  {"title": "Sunglasses", "badge_text": "Sun Protection",
+                     "cta_text": "View All Sunglasses", "cta_link": "/shop?category=sunglasses", "sort_order": 5},
+    "eyeglasses":  {"title": "Eyeglasses", "badge_text": "Prescription Ready",
+                     "cta_text": "View All Eyeglasses", "cta_link": "/shop?category=eyeglasses", "sort_order": 6},
+}
+
+# The shape-browsing section ("Shop by Shape" / "Frames That Suit You"). Its
+# tiles still come from Admin > Attributes > Frame Shape images, but the
+# section's own heading + visibility is now a real, editable row too — id
+# fixed at "shape" so it's a single, non-duplicable section like the others.
+HOME_SHAPE_SECTION_DEFAULTS = {
+    "title": "Frames That Suit You", "badge_text": "Shop by Shape",
+    "cta_text": "Explore Collection", "cta_link": "/shop",
+}
+
+
+def ensure_builtin_home_sections():
+    """Idempotent, self-healing seed. The 7 carousels are gated behind a
+    store_settings flag (cheap: skip 7 lookups once seeded); the shape row is
+    checked unconditionally on its own — a single indexed lookup — so seeding
+    something new later (like this one was) can't get silently skipped by an
+    already-true flag from before it existed."""
+    settings = get_cached_store_settings()
+    changed = False
+
+    if settings.get("home_builtin_carousels_seeded") != "true":
+        for key, d in HOME_BUILTIN_CAROUSEL_DEFAULTS.items():
+            if db.query_one("SELECT id FROM home_sections WHERE id=?", [key]):
+                continue
+            is_active = 1 if settings.get(f"home_visible_{key}", "true") != "false" else 0
+            db.execute(
+                """INSERT INTO home_sections
+                   (id, section_type, title, badge_text, cta_text, cta_link, sort_order, is_active)
+                   VALUES (?,?,?,?,?,?,?,?)""",
+                [key, "carousel", d["title"], d["badge_text"], d["cta_text"], d["cta_link"], d["sort_order"], is_active]
+            )
+        db.execute(
+            "INSERT INTO store_settings (key, value) VALUES ('home_builtin_carousels_seeded','true') "
+            "ON CONFLICT (key) DO UPDATE SET value='true'"
+        )
+        changed = True
+
+    if not db.query_one("SELECT id FROM home_sections WHERE id='shape'"):
+        d = HOME_SHAPE_SECTION_DEFAULTS
+        is_active = 1 if settings.get("home_visible_shape", "true") != "false" else 0
+        db.execute(
+            """INSERT INTO home_sections
+               (id, section_type, title, badge_text, cta_text, cta_link, sort_order, is_active)
+               VALUES (?,?,?,?,?,?,?,?)""",
+            ["shape", "shape", d["title"], d["badge_text"], d["cta_text"], d["cta_link"], 0, is_active]
+        )
+        changed = True
+
+    if changed:
+        get_home_sections.cache_clear()
+        get_cached_store_settings.cache_clear()
+
+
+def get_home_sections_admin(section_type):
+    """All homepage content blocks of one type (including hidden ones), for the admin list."""
+    return db.query(
+        "SELECT * FROM home_sections WHERE section_type=? ORDER BY sort_order ASC, created_at ASC",
+        [section_type]
+    ) or []
+
+
+def get_home_section(item_id):
+    return db.query_one("SELECT * FROM home_sections WHERE id=?", [item_id])
+
+
+@ttl_cache(ttl_seconds=120)
+def get_home_product_picks(section_key):
+    """Ordered product IDs an admin has manually curated for a homepage carousel.
+    Empty list means that section should fall back to its automatic selection."""
+    rows = db.query(
+        "SELECT product_id FROM home_product_picks WHERE section_key=? ORDER BY sort_order ASC",
+        [section_key]
+    )
+    return [r["product_id"] for r in rows] if rows else []
+
+
+def get_home_product_picks_admin(section_key):
+    """Curated products for one section with display details, in admin-set order."""
+    return db.query(
+        """
+        SELECT hpp.id AS pick_id, hpp.sort_order, hpp.product_id,
+               p.name, p.sku, p.price, p.sale_price,
+               m.file_url AS image_url
+        FROM home_product_picks hpp
+        JOIN products p ON p.id = hpp.product_id
+        LEFT JOIN product_images pi ON pi.product_id = p.id AND pi.is_primary = 1
+        LEFT JOIN media m ON m.id = pi.media_id
+        WHERE hpp.section_key = ?
+        ORDER BY hpp.sort_order ASC
+        """,
+        [section_key]
+    ) or []
+
+
+def get_products_by_ids(product_ids):
+    """Fetch active products by explicit ID list, preserving the given order."""
+    if not product_ids:
+        return []
+    placeholders = ",".join(["?"] * len(product_ids))
+    rows = db.query(
+        f"{PRODUCTS_SELECT} WHERE p.id IN ({placeholders}) AND p.is_active = 1",
+        list(product_ids)
+    )
+    by_id = {r["id"]: r for r in rows}
+    return [by_id[pid] for pid in product_ids if pid in by_id]
 
 
 @ttl_cache(ttl_seconds=120)

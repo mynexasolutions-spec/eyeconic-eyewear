@@ -18,7 +18,7 @@
   enctype="multipart/form-data">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
 
-  <div style="display:grid; grid-template-columns: 2fr 1fr; gap:2rem; align-items: flex-start;">
+  <div class="admin-form-grid-main">
 
     <!-- LEFT COLUMN: Main Info -->
     <div style="display:flex; flex-direction:column; gap:2rem;">
@@ -35,7 +35,7 @@
             style="background:#fff;" />
         </div>
 
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.25rem; margin-bottom:1.25rem;">
+        <div class="admin-form-grid-2" style="gap:1.25rem; margin-bottom:1.25rem;">
           <div>
             <label class="admin-label">Slug (Optional)</label>
             <input type="text" name="slug" value="{{ product.slug if product else '' }}" placeholder="auto-generated"
@@ -67,7 +67,7 @@
           style="font-size:1rem; font-weight:700; margin-bottom:1.5rem; border-bottom:1px solid var(--admin-border); padding-bottom:0.75rem;">
           Pricing & Inventory</h3>
 
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; margin-bottom:1.5rem;">
+        <div class="admin-form-grid-2" style="gap:1.5rem; margin-bottom:1.5rem;">
           <div>
             <label class="admin-label">Regular Price (₹) *</label>
             <input type="number" step="0.01" name="price" value="{{ product.price if product else 0 }}" required
@@ -81,7 +81,7 @@
           </div>
         </div>
 
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem;">
+        <div class="admin-form-grid-2" style="gap:1.5rem;">
           <div>
             <label class="admin-label">Stock Quantity</label>
             <input type="number" name="stock_quantity" value="{{ product.stock_quantity if product else 0 }}"
@@ -270,8 +270,8 @@
           {% if action == 'edit' and variations %}
           <div style="margin-top:2rem;">
             <label class="admin-label" style="margin-bottom:1.25rem; display:block; font-weight:700; color:var(--admin-text-muted); text-transform:uppercase; letter-spacing:0.025em;">Manage Variations (Stock & Price)</label>
-            <div style="background:#fff; border:1px solid var(--admin-border); border-radius:0.75rem; overflow:hidden;">
-              <table class="admin-table" style="width:100%; border-collapse:collapse;">
+            <div style="background:#fff; border:1px solid var(--admin-border); border-radius:0.75rem; overflow-x:auto;">
+              <table class="admin-table" style="width:100%; border-collapse:collapse; min-width:600px;">
                 <thead style="background:#f9fafb;">
                   <tr>
                     <th style="padding:1rem; text-align:left; font-size:0.75rem;">VARIATION</th>

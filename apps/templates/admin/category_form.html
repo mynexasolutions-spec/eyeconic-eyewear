@@ -14,7 +14,7 @@
 <form method="post" action="{% if category %}{{ url_for('admin_category_edit', cat_id=category.id) }}{% else %}{{ url_for('admin_category_new') }}{% endif %}" class="admin-card" style="padding:2.5rem; max-width:700px;" enctype="multipart/form-data">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
 
-  <div style="display:grid; grid-template-columns:1fr 1fr; gap:2rem; margin-bottom:1.5rem;">
+  <div class="admin-form-grid-2" style="gap:2rem; margin-bottom:1.5rem;">
     <div>
       <label class="admin-label">Category Name *</label>
       <input type="text" name="name" value="{{ category.name if category else '' }}" required class="admin-input" style="background:#fff;" />

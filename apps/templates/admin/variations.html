@@ -35,7 +35,7 @@
           <input type="text" name="sku" required placeholder="e.g. {{ product.name[:3]|upper }}-VAR1" class="admin-input" />
         </div>
 
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1.25rem;">
+        <div class="admin-form-grid-2" style="gap:1rem; margin-bottom:1.25rem;">
           <div>
             <label class="admin-label">Price (₹) *</label>
             <input type="number" step="0.01" name="price" required class="admin-input" value="{{ product.price }}" />

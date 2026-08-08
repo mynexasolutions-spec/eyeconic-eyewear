@@ -1755,6 +1755,35 @@
       color: var(--mid-gray);
     }
 
+    /* ── Global Button (.btn-atc) ── */
+    .btn-atc {
+      background: var(--charcoal);
+      color: #fff;
+      font-family: var(--font-body);
+      font-size: 0.85rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      font-weight: 700;
+      padding: 12px 2rem;
+      height: 50px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+    }
+    .btn-atc:hover:not(:disabled) {
+      background: var(--gold);
+    }
+    .btn-atc:disabled {
+      background: var(--light-gray);
+      color: var(--mid-gray);
+      cursor: not-allowed;
+    }
+
     /* ── Light page defaults ── */
     body {
       background: var(--warm-white) !important;

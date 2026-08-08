@@ -1,0 +1,213 @@
+{% extends "admin/base.html" %}
+{% set stype = item.section_type if item else section_type %}
+{% set type_labels = {'hero': 'Hero Slide', 'category': 'Category Tile', 'carousel': 'Product Carousel', 'banner': 'Lifestyle Banner', 'stat': 'Trust Stat', 'testimonial': 'Testimonial', 'instagram': 'Instagram Photo', 'shape': 'Shop by Shape Section'} %}
+{% block title %}{{ 'Edit' if item else 'New' }} {{ type_labels[stype] }} – StoreAdmin{% endblock %}
+
+{% block content %}
+<div style="margin-bottom:2rem;">
+  <div style="display:flex; align-items:center; gap:0.5rem; color:var(--admin-text-muted); font-size:0.875rem; margin-bottom:1rem;">
+    <a href="{{ url_for('admin_homepage') }}" style="color:var(--admin-primary);">Home Page</a>
+    <span>/</span>
+    <span>{{ 'Edit' if item else 'New' }} {{ type_labels[stype] }}</span>
+  </div>
+  <h1 style="font-size:1.5rem; font-weight:700; color:var(--admin-text-main); margin:0;">{{ 'Edit' if item else 'Add' }} {{ type_labels[stype] }}</h1>
+</div>
+
+<form method="post"
+  action="{% if item %}{{ url_for('admin_homepage_edit', item_id=item.id) }}{% else %}{{ url_for('admin_homepage_new', section_type=stype) }}{% endif %}"
+  class="admin-card" style="padding:2.5rem; max-width:800px;" enctype="multipart/form-data">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+
+  {% if stype in ('hero', 'category', 'banner', 'instagram', 'testimonial') %}
+  <div style="margin-bottom:2rem;">
+    <label class="admin-label">{{ 'Customer Photo (optional)' if stype == 'testimonial' else 'Image' }}{% if stype == 'hero' %} (recommended 1600×900px){% elif stype == 'banner' %} (recommended 1600×700px){% elif stype == 'category' %} (recommended 800×1000px, portrait){% elif stype == 'testimonial' %} (square photo, e.g. 200×200px){% endif %}</label>
+    <div style="display:flex; gap:1.5rem; align-items:start; background:#f9fafb; padding:1.25rem; border-radius:0.75rem; border:1px solid var(--admin-border);">
+      {% if item and item.image_url %}
+      <div style="width:100px; height:100px; {% if stype == 'testimonial' %}border-radius:50%{% else %}border-radius:8px{% endif %}; overflow:hidden; border:1px solid var(--admin-border); background:white;">
+        <img src="{{ resolve_image(item.image_url) }}" style="width:100%; height:100%; object-fit:cover;" />
+      </div>
+      {% endif %}
+      <div style="flex:1;">
+        <label style="display:block; font-size:0.75rem; font-weight:700; color:var(--admin-text-muted); text-transform:uppercase; margin-bottom:0.5rem;">Upload {{ 'Photo' if stype == 'testimonial' else 'Image' }}</label>
+        <input type="file" name="image_file" class="admin-input" accept="image/*" style="padding:0.5rem; background:white;" />
+        <p style="font-size:0.78rem; color:var(--admin-text-muted); margin-top:0.5rem;">Or paste an image URL instead:</p>
+        <input type="text" name="image_url" placeholder="https://..." class="admin-input" style="background:#fff; margin-top:0.35rem;" value="{% if item and item.image_url and item.image_url.startswith('http') %}{{ item.image_url }}{% endif %}" />
+        {% if stype == 'testimonial' %}<p style="font-size:0.78rem; color:var(--admin-text-muted); margin-top:0.5rem;">Leave empty to show the customer's initials instead.</p>{% endif %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if stype == 'category' %}
+  <div class="admin-form-grid-2" style="gap:1.5rem; margin-bottom:1.5rem;">
+    <div>
+      <label class="admin-label">Category Name *</label>
+      <input type="text" name="title" value="{{ item.title if item else '' }}" required placeholder="e.g. Men" class="admin-input" style="background:#fff;" />
+    </div>
+    <div>
+      <label class="admin-label">Button Text</label>
+      <input type="text" name="cta_text" value="{{ item.cta_text if item else 'Explore Now' }}" placeholder="Explore Now" class="admin-input" style="background:#fff;" />
+    </div>
+  </div>
+  <div style="margin-bottom:1.5rem;">
+    <label class="admin-label">Tile Link *</label>
+    <input type="text" name="cta_link" value="{{ item.cta_link if item else '' }}" required placeholder="/shop?category=men" class="admin-input" style="background:#fff;" />
+    <p style="font-size:0.78rem; color:var(--admin-text-muted); margin-top:0.4rem;">Where the tile and its "Explore Now" button link to — usually /shop?category=&lt;slug&gt;.</p>
+  </div>
+  {% endif %}
+
+  {% if stype == 'carousel' %}
+  <div style="margin-bottom:1.5rem;">
+    <label class="admin-label">Eyebrow Label</label>
+    <input type="text" name="badge_text" value="{{ item.badge_text if item else '' }}" placeholder="e.g. New Arrivals" class="admin-input" style="background:#fff;" />
+    <p style="font-size:0.78rem; color:var(--admin-text-muted); margin-top:0.4rem;">Small label shown above the heading (like "For Him" above "Men's Eyewear").</p>
+  </div>
+  <div style="margin-bottom:1.5rem;">
+    <label class="admin-label">Carousel Heading *</label>
+    <input type="text" name="title" value="{{ item.title if item else '' }}" required placeholder="e.g. Premium Glasses" class="admin-input" style="background:#fff;" />
+  </div>
+  <div class="admin-form-grid-2" style="gap:1.5rem; margin-bottom:1.5rem;">
+    <div>
+      <label class="admin-label">"View All" Button Text</label>
+      <input type="text" name="cta_text" value="{{ item.cta_text if item else 'View All' }}" placeholder="View All" class="admin-input" style="background:#fff;" />
+    </div>
+    <div>
+      <label class="admin-label">"View All" Button Link</label>
+      <input type="text" name="cta_link" value="{{ item.cta_link if item else '/shop' }}" placeholder="/shop" class="admin-input" style="background:#fff;" />
+    </div>
+  </div>
+  {% if item %}
+  <p style="font-size:0.8rem; color:var(--admin-text-muted); margin-bottom:1.5rem;">Manage which products appear in this carousel from the <a href="{{ url_for('admin_homepage_products', section_key=item.id) }}" style="color:var(--admin-primary);">Home Page</a> screen after saving.</p>
+  {% else %}
+  <p style="font-size:0.8rem; color:var(--admin-text-muted); margin-bottom:1.5rem;">After you save, you'll be able to pick which products appear in this carousel.</p>
+  {% endif %}
+  {% endif %}
+
+  {% if stype == 'shape' %}
+  <div style="margin-bottom:1.5rem;">
+    <label class="admin-label">Eyebrow Label</label>
+    <input type="text" name="badge_text" value="{{ item.badge_text if item else 'Shop by Shape' }}" placeholder="e.g. Shop by Shape" class="admin-input" style="background:#fff;" />
+  </div>
+  <div style="margin-bottom:1.5rem;">
+    <label class="admin-label">Section Heading *</label>
+    <input type="text" name="title" value="{{ item.title if item else 'Frames That Suit You' }}" required placeholder="e.g. Frames That Suit You" class="admin-input" style="background:#fff;" />
+  </div>
+  <div class="admin-form-grid-2" style="gap:1.5rem; margin-bottom:1.5rem;">
+    <div>
+      <label class="admin-label">Button Text</label>
+      <input type="text" name="cta_text" value="{{ item.cta_text if item else 'Explore Collection' }}" placeholder="Explore Collection" class="admin-input" style="background:#fff;" />
+    </div>
+    <div>
+      <label class="admin-label">Button Link</label>
+      <input type="text" name="cta_link" value="{{ item.cta_link if item else '/shop' }}" placeholder="/shop" class="admin-input" style="background:#fff;" />
+    </div>
+  </div>
+  <p style="font-size:0.8rem; color:var(--admin-text-muted); margin-bottom:1.5rem;">The individual shape tiles (Round, Aviator, etc.) are managed in Admin &gt; Attributes &gt; Frame Shape, not here.</p>
+  {% endif %}
+
+  {% if stype in ('hero', 'banner') %}
+  <div style="margin-bottom:1.5rem;">
+    <label class="admin-label">Badge / Section Label</label>
+    <input type="text" name="badge_text" value="{{ item.badge_text if item else '' }}" placeholder="e.g. New Collection 2025" class="admin-input" style="background:#fff;" />
+  </div>
+  <div class="admin-form-grid-2" style="gap:1.5rem; margin-bottom:1.5rem;">
+    <div>
+      <label class="admin-label">Title (Line 1) *</label>
+      <input type="text" name="title" value="{{ item.title if item else '' }}" required class="admin-input" style="background:#fff;" />
+    </div>
+    <div>
+      <label class="admin-label">Title (Line 2 / Emphasized)</label>
+      <input type="text" name="subtitle" value="{{ item.subtitle if item else '' }}" class="admin-input" style="background:#fff;" />
+    </div>
+  </div>
+  <div style="margin-bottom:1.5rem;">
+    <label class="admin-label">Description</label>
+    <textarea name="body" rows="3" class="admin-input" style="background:#fff;">{{ item.body if item else '' }}</textarea>
+  </div>
+  <div class="admin-form-grid-2" style="gap:1.5rem; margin-bottom:1.5rem;">
+    <div>
+      <label class="admin-label">Primary Button Text</label>
+      <input type="text" name="cta_text" value="{{ item.cta_text if item else '' }}" placeholder="e.g. Shop Now" class="admin-input" style="background:#fff;" />
+    </div>
+    <div>
+      <label class="admin-label">Primary Button Link</label>
+      <input type="text" name="cta_link" value="{{ item.cta_link if item else '' }}" placeholder="/shop" class="admin-input" style="background:#fff;" />
+    </div>
+  </div>
+  {% endif %}
+
+  {% if stype == 'hero' %}
+  <div class="admin-form-grid-2" style="gap:1.5rem; margin-bottom:1.5rem;">
+    <div>
+      <label class="admin-label">Secondary Button Text</label>
+      <input type="text" name="cta2_text" value="{{ item.cta2_text if item else '' }}" placeholder="e.g. Explore Collection" class="admin-input" style="background:#fff;" />
+    </div>
+    <div>
+      <label class="admin-label">Secondary Button Link</label>
+      <input type="text" name="cta2_link" value="{{ item.cta2_link if item else '' }}" placeholder="/shop" class="admin-input" style="background:#fff;" />
+    </div>
+  </div>
+  {% endif %}
+
+  {% if stype == 'stat' %}
+  <div class="admin-form-grid-2" style="gap:1.5rem; margin-bottom:1.5rem;">
+    <div>
+      <label class="admin-label">Stat Value *</label>
+      <input type="text" name="title" value="{{ item.title if item else '' }}" required placeholder="e.g. 50K+" class="admin-input" style="background:#fff;" />
+    </div>
+    <div>
+      <label class="admin-label">Stat Label *</label>
+      <input type="text" name="subtitle" value="{{ item.subtitle if item else '' }}" required placeholder="e.g. Happy Customers" class="admin-input" style="background:#fff;" />
+    </div>
+  </div>
+  {% endif %}
+
+  {% if stype == 'testimonial' %}
+  <div class="admin-form-grid-2" style="gap:1.5rem; margin-bottom:1.5rem;">
+    <div>
+      <label class="admin-label">Customer Name *</label>
+      <input type="text" name="title" value="{{ item.title if item else '' }}" required class="admin-input" style="background:#fff;" />
+    </div>
+    <div>
+      <label class="admin-label">City</label>
+      <input type="text" name="subtitle" value="{{ item.subtitle if item else '' }}" class="admin-input" style="background:#fff;" />
+    </div>
+  </div>
+  <div style="margin-bottom:1.5rem;">
+    <label class="admin-label">Review Text *</label>
+    <textarea name="body" rows="4" required class="admin-input" style="background:#fff;">{{ item.body if item else '' }}</textarea>
+  </div>
+  <div style="margin-bottom:1.5rem; max-width:200px;">
+    <label class="admin-label">Rating</label>
+    <select name="rating" class="admin-input" style="background:#fff;">
+      {% for n in [5,4,3,2,1] %}
+      <option value="{{ n }}" {% if item and item.rating == n %}selected{% elif not item and n == 5 %}selected{% endif %}>{{ n }} Star{{ 's' if n != 1 }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  {% endif %}
+
+  {% if stype == 'instagram' %}
+  <div class="admin-form-grid-2" style="gap:1.5rem; margin-bottom:1.5rem;">
+    <div>
+      <label class="admin-label">Alt Text</label>
+      <input type="text" name="title" value="{{ item.title if item else '' }}" placeholder="Community style photo" class="admin-input" style="background:#fff;" />
+    </div>
+    <div>
+      <label class="admin-label">Link (optional)</label>
+      <input type="text" name="link_url" value="{{ item.link_url if item else '' }}" placeholder="https://instagram.com/p/..." class="admin-input" style="background:#fff;" />
+    </div>
+  </div>
+  {% endif %}
+
+  <div style="margin-bottom:2rem; display:flex; align-items:center; gap:0.75rem; padding:1rem 1.25rem; background:#f9fafb; border-radius:0.75rem; border:1px solid var(--admin-border);">
+    <input type="checkbox" name="is_active" id="is_active" {% if not item or item.is_active %}checked{% endif %} style="width:18px; height:18px; accent-color:var(--admin-primary);" />
+    <label for="is_active" style="font-weight:600; font-size:0.9rem; color:var(--admin-text-main); cursor:pointer;">Visible on the live site</label>
+  </div>
+
+  <div style="display:flex; gap:1rem; padding-top:1.5rem; border-top:1px solid var(--admin-border);">
+    <button type="submit" class="admin-btn btn-primary" style="padding:0.75rem 2rem; font-weight:700;">Save</button>
+    <a href="{{ url_for('admin_homepage') }}" class="admin-btn btn-outline" style="padding:0.75rem 2rem;">Cancel</a>
+  </div>
+</form>
+{% endblock %}

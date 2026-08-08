@@ -173,6 +173,9 @@ CREATE TABLE IF NOT EXISTS orders (
     discount_amount      DECIMAL(10,2) DEFAULT 0,
     cancelled_at         TIMESTAMP,
     cancel_reason        TEXT DEFAULT '',
+    awb_number           TEXT DEFAULT '',
+    shipment_courier     TEXT DEFAULT '',
+    shipment_tracking_url TEXT DEFAULT '',
     created_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -240,6 +243,37 @@ CREATE TABLE IF NOT EXISTS newsletter_subscribers (
     subscribed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Home page content blocks (hero slides, trust stats, lifestyle banner,
+-- testimonials, instagram tiles) — managed from Admin > Home Page.
+CREATE TABLE IF NOT EXISTS home_sections (
+    id           TEXT PRIMARY KEY DEFAULT lower(encode(gen_random_bytes(16), 'hex')),
+    section_type TEXT NOT NULL,
+    title        TEXT DEFAULT '',
+    subtitle     TEXT DEFAULT '',
+    body         TEXT DEFAULT '',
+    badge_text   TEXT DEFAULT '',
+    image_url    TEXT DEFAULT '',
+    link_url     TEXT DEFAULT '',
+    cta_text     TEXT DEFAULT '',
+    cta_link     TEXT DEFAULT '',
+    cta2_text    TEXT DEFAULT '',
+    cta2_link    TEXT DEFAULT '',
+    rating       INTEGER DEFAULT 5,
+    sort_order   INTEGER DEFAULT 0,
+    is_active    INTEGER DEFAULT 1,
+    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Curated per-section product picks for home page product carousels.
+-- Empty for a section_key = that section falls back to automatic selection.
+CREATE TABLE IF NOT EXISTS home_product_picks (
+    id          TEXT PRIMARY KEY DEFAULT lower(encode(gen_random_bytes(16), 'hex')),
+    section_key TEXT NOT NULL,
+    product_id  TEXT NOT NULL,
+    sort_order  INTEGER DEFAULT 0,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_products_is_active      ON products(is_active);
 CREATE INDEX IF NOT EXISTS idx_products_category_id    ON products(category_id);
@@ -257,6 +291,8 @@ CREATE INDEX IF NOT EXISTS idx_user_addresses_user_id  ON user_addresses(user_id
 CREATE INDEX IF NOT EXISTS idx_categories_slug         ON categories(slug);
 CREATE INDEX IF NOT EXISTS idx_brands_slug             ON brands(slug);
 CREATE INDEX IF NOT EXISTS idx_attributes_slug         ON attributes(slug);
+CREATE INDEX IF NOT EXISTS idx_home_sections_type      ON home_sections(section_type, is_active, sort_order);
+CREATE INDEX IF NOT EXISTS idx_home_product_picks_sec  ON home_product_picks(section_key, sort_order);
 
 -- Default store settings
 INSERT INTO store_settings (key, value) VALUES

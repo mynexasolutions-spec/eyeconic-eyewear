@@ -6,7 +6,8 @@ from functools import wraps
 from flask import render_template, request, redirect, url_for, flash, abort, session
 import db
 from helpers import slugify, get_cached_store_settings, get_unique_slug, handle_upload
-from queries import get_products, get_categories, get_brands, get_admin_stats, get_featured_categories, get_trending_shapes, PRODUCTS_SELECT, get_product_detail, get_homepage_products
+from queries import get_products, get_categories, get_brands, get_admin_stats, get_featured_categories, get_trending_shapes, PRODUCTS_SELECT, get_product_detail, get_homepage_products, get_home_sections, get_home_sections_admin, get_home_section, get_home_product_picks, get_home_product_picks_admin, ensure_builtin_home_sections, HOME_BUILTIN_CAROUSEL_DEFAULTS
+import shipping
 
 
 def _sanitize_sku_prefix(prefix, fallback):
@@ -666,14 +667,115 @@ def register(app):
             if not order:
                 abort(404)
             items = db.query(
-                "SELECT oi.*, p.name AS product_name, p.sku FROM order_items oi "
-                "LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id=?",
+                """SELECT oi.*, p.name AS product_name, p.sku, m.file_url AS image_url
+                   FROM order_items oi
+                   LEFT JOIN products p ON p.id = oi.product_id
+                   LEFT JOIN product_images pi ON pi.product_id = oi.product_id AND pi.is_primary = 1
+                   LEFT JOIN media m ON m.id = pi.media_id
+                   WHERE oi.order_id=?""",
                 [order_id]
             )
+            shipping_address = {}
+            if order.get("shipping_address_json"):
+                try:
+                    import json
+                    shipping_address = json.loads(order["shipping_address_json"])
+                except Exception:
+                    pass
         except Exception as e:
             flash(f"Error: {e}", "error")
             return redirect(url_for("admin_orders"))
-        return render_template("admin/order_detail.html", order=order, items=items)
+
+        tracking = None
+        if order.get("awb_number"):
+            if not order.get("shipment_tracking_url"):
+                fallback_url = shipping.tracking_url_for(order["awb_number"])
+                try:
+                    db.execute("UPDATE orders SET shipment_tracking_url=? WHERE id=?", [fallback_url, order_id])
+                    order["shipment_tracking_url"] = fallback_url
+                except Exception:
+                    pass
+            try:
+                ok, _msg, tracking = shipping.track_shipment(order["awb_number"])
+                if not ok:
+                    tracking = None
+            except Exception:
+                tracking = None
+
+            if tracking and order.get("status") not in ("delivered", "cancelled", "refunded"):
+                inferred = shipping.infer_order_status(tracking.get("current_status"))
+                status_rank = {"pending": 0, "processing": 1, "shipped": 2, "delivered": 3}
+                if inferred and status_rank.get(inferred, 0) > status_rank.get(order.get("status"), 0):
+                    try:
+                        db.execute("UPDATE orders SET status=? WHERE id=?", [inferred, order_id])
+                        order["status"] = inferred
+                        flash(f"Order status auto-updated to '{inferred}' based on courier tracking.", "success")
+                    except Exception:
+                        pass
+
+        default_weight = get_cached_store_settings().get("ithink_default_weight_kg", "").strip() or "0.5"
+        return render_template(
+            "admin/order_detail.html", order=order, items=items, shipping_address=shipping_address,
+            tracking=tracking, shipping_configured=shipping.is_configured(), default_weight=default_weight
+        )
+
+    @app.route("/admin/orders/<order_id>/ship", methods=["POST"])
+    @require_admin
+    def admin_order_create_shipment(order_id):
+        order = db.query_one(
+            """SELECT o.*, (u.first_name || ' ' || u.last_name) AS customer_name, u.email AS customer_email
+               FROM orders o LEFT JOIN users u ON u.id = o.user_id WHERE o.id=?""",
+            [order_id]
+        )
+        if not order:
+            abort(404)
+        items = db.query(
+            "SELECT oi.*, p.sku FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id=?",
+            [order_id]
+        )
+        shipping_address = {}
+        if order.get("shipping_address_json"):
+            try:
+                import json
+                shipping_address = json.loads(order["shipping_address_json"])
+            except Exception:
+                pass
+        weight_raw = request.form.get("weight", "").strip()
+        try:
+            weight = weight_raw if weight_raw and float(weight_raw) > 0 else None
+        except ValueError:
+            weight = None
+        ok, message, info = shipping.create_shipment(order, items, shipping_address, weight=weight)
+        if ok:
+            db.execute(
+                "UPDATE orders SET awb_number=?, shipment_courier=?, shipment_tracking_url=? WHERE id=?",
+                [info["awb_number"], info["courier"], info["tracking_url"], order_id]
+            )
+            flash(f"Shipment created — AWB {info['awb_number']} ({info['courier']}).", "success")
+        else:
+            flash(f"Could not create shipment: {message}", "error")
+        return redirect(url_for("admin_order_detail", order_id=order_id))
+
+    @app.route("/admin/orders/<order_id>/cancel-shipment", methods=["POST"])
+    @require_admin
+    def admin_order_cancel_shipment(order_id):
+        order = db.query_one("SELECT awb_number FROM orders WHERE id=?", [order_id])
+        if not order or not order.get("awb_number"):
+            flash("This order has no shipment to cancel.", "error")
+            return redirect(url_for("admin_order_detail", order_id=order_id))
+        ok, message, _info = shipping.cancel_shipment(order["awb_number"])
+        # Always clear the local record on an explicit cancel — even if iThink couldn't
+        # confirm it (e.g. a stale/test AWB that no longer exists on their side), the
+        # admin should still be able to detach it here and create a fresh shipment.
+        db.execute(
+            "UPDATE orders SET awb_number='', shipment_courier='', shipment_tracking_url='' WHERE id=?",
+            [order_id]
+        )
+        if ok:
+            flash("Shipment cancelled.", "success")
+        else:
+            flash(f"Shipment removed from this order, but iThink Logistics did not confirm cancellation: {message}", "error")
+        return redirect(url_for("admin_order_detail", order_id=order_id))
 
     @app.route("/admin/orders/<order_id>/status", methods=["POST"])
     @require_admin
@@ -1295,6 +1397,294 @@ def register(app):
             flash(f"Error: {e}", "error")
         return redirect(url_for("admin_reviews"))
 
+    # ── Home Page Customization ───────────────────────────────────────────────
+
+    HOME_SECTION_TYPES = ["hero", "category", "carousel", "banner", "stat", "testimonial", "instagram"]
+
+    @app.route("/admin/homepage")
+    @require_admin
+    def admin_homepage():
+        ensure_builtin_home_sections()
+        sections = {t: get_home_sections_admin(t) for t in HOME_SECTION_TYPES}
+        shape_section = get_home_section("shape")
+        settings = get_cached_store_settings()
+        section_visible = {t: settings.get(f"home_visible_{t}", "true") != "false" for t in HOME_SECTION_TYPES}
+        for c in sections["carousel"]:
+            row = db.query_one("SELECT COUNT(*) AS cnt FROM home_product_picks WHERE section_key=?", [c["id"]])
+            c["product_count"] = row.get("cnt", 0) if row else 0
+            c["is_builtin"] = c["id"] in HOME_BUILTIN_CAROUSEL_DEFAULTS
+        return render_template(
+            "admin/homepage.html", sections=sections, shape_section=shape_section,
+            section_visible=section_visible,
+        )
+
+    @app.route("/admin/homepage/section/<stype>/toggle", methods=["POST"])
+    @require_admin
+    def admin_homepage_section_toggle(stype):
+        if stype not in HOME_SECTION_TYPES:
+            abort(404)
+        try:
+            settings = get_cached_store_settings()
+            currently_visible = settings.get(f"home_visible_{stype}", "true") != "false"
+            new_value = "false" if currently_visible else "true"
+            db.execute(
+                "INSERT INTO store_settings (key, value) VALUES (?,?) "
+                "ON CONFLICT (key) DO UPDATE SET value=?, updated_at=NOW()",
+                [f"home_visible_{stype}", new_value, new_value]
+            )
+            get_cached_store_settings.cache_clear()
+        except Exception as e:
+            flash(f"Error: {e}", "error")
+        return redirect(url_for("admin_homepage"))
+
+    @app.route("/admin/homepage/<section_type>/new", methods=["GET", "POST"])
+    @require_admin
+    def admin_homepage_new(section_type):
+        if section_type not in HOME_SECTION_TYPES:
+            abort(404)
+        if request.method == "POST":
+            f = request.form
+            image_url = handle_upload(request.files.get("image_file")) or f.get("image_url", "").strip() or None
+            try:
+                row = db.query_one(
+                    "SELECT COALESCE(MAX(sort_order), -1) AS m FROM home_sections WHERE section_type=?",
+                    [section_type]
+                )
+                next_order = (row["m"] if row else -1) + 1
+                db.execute(
+                    """INSERT INTO home_sections
+                       (id, section_type, title, subtitle, body, badge_text, image_url, link_url,
+                        cta_text, cta_link, cta2_text, cta2_link, rating, sort_order, is_active)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    [str(uuid.uuid4()), section_type,
+                     f.get("title", "").strip(), f.get("subtitle", "").strip(), f.get("body", "").strip(),
+                     f.get("badge_text", "").strip(), image_url, f.get("link_url", "").strip(),
+                     f.get("cta_text", "").strip(), f.get("cta_link", "").strip(),
+                     f.get("cta2_text", "").strip(), f.get("cta2_link", "").strip(),
+                     int(f.get("rating") or 5), next_order,
+                     1 if f.get("is_active") == "on" else 0]
+                )
+                get_home_sections.cache_clear()
+                flash("Homepage item created.", "success")
+                return redirect(url_for("admin_homepage"))
+            except Exception as e:
+                flash(f"Error: {e}", "error")
+        return render_template("admin/homepage_form.html", item=None, section_type=section_type)
+
+    @app.route("/admin/homepage/<item_id>/edit", methods=["GET", "POST"])
+    @require_admin
+    def admin_homepage_edit(item_id):
+        item = get_home_section(item_id)
+        if not item:
+            abort(404)
+        if request.method == "POST":
+            f = request.form
+            image_url = handle_upload(request.files.get("image_file")) or f.get("image_url", "").strip() or item["image_url"]
+            try:
+                db.execute(
+                    """UPDATE home_sections SET title=?, subtitle=?, body=?, badge_text=?, image_url=?, link_url=?,
+                       cta_text=?, cta_link=?, cta2_text=?, cta2_link=?, rating=?, is_active=? WHERE id=?""",
+                    [f.get("title", "").strip(), f.get("subtitle", "").strip(), f.get("body", "").strip(),
+                     f.get("badge_text", "").strip(), image_url, f.get("link_url", "").strip(),
+                     f.get("cta_text", "").strip(), f.get("cta_link", "").strip(),
+                     f.get("cta2_text", "").strip(), f.get("cta2_link", "").strip(),
+                     int(f.get("rating") or 5), 1 if f.get("is_active") == "on" else 0, item_id]
+                )
+                get_home_sections.cache_clear()
+                flash("Homepage item updated.", "success")
+                return redirect(url_for("admin_homepage"))
+            except Exception as e:
+                flash(f"Error: {e}", "error")
+        return render_template("admin/homepage_form.html", item=item, section_type=item["section_type"])
+
+    @app.route("/admin/homepage/<item_id>/delete", methods=["POST"])
+    @require_admin
+    def admin_homepage_delete(item_id):
+        try:
+            with db.transaction() as tx:
+                tx.execute("DELETE FROM home_sections WHERE id=?", [item_id])
+                tx.execute("DELETE FROM home_product_picks WHERE section_key=?", [item_id])
+            get_home_sections.cache_clear()
+            get_home_product_picks.cache_clear()
+            flash("Homepage item deleted.", "success")
+        except Exception as e:
+            flash(f"Error: {e}", "error")
+        return redirect(url_for("admin_homepage"))
+
+    @app.route("/admin/homepage/<item_id>/toggle", methods=["POST"])
+    @require_admin
+    def admin_homepage_toggle(item_id):
+        try:
+            db.execute(
+                "UPDATE home_sections SET is_active = CASE WHEN is_active=1 THEN 0 ELSE 1 END WHERE id=?",
+                [item_id]
+            )
+            get_home_sections.cache_clear()
+        except Exception as e:
+            flash(f"Error: {e}", "error")
+        return redirect(url_for("admin_homepage"))
+
+    @app.route("/admin/homepage/<item_id>/move/<direction>", methods=["POST"])
+    @require_admin
+    def admin_homepage_move(item_id, direction):
+        if direction not in ("up", "down"):
+            abort(404)
+        item = get_home_section(item_id)
+        if not item:
+            abort(404)
+        try:
+            if direction == "up":
+                neighbor = db.query_one(
+                    "SELECT * FROM home_sections WHERE section_type=? AND sort_order < ? ORDER BY sort_order DESC LIMIT 1",
+                    [item["section_type"], item["sort_order"]]
+                )
+            else:
+                neighbor = db.query_one(
+                    "SELECT * FROM home_sections WHERE section_type=? AND sort_order > ? ORDER BY sort_order ASC LIMIT 1",
+                    [item["section_type"], item["sort_order"]]
+                )
+            if neighbor:
+                with db.transaction() as tx:
+                    tx.execute("UPDATE home_sections SET sort_order=? WHERE id=?", [neighbor["sort_order"], item["id"]])
+                    tx.execute("UPDATE home_sections SET sort_order=? WHERE id=?", [item["sort_order"], neighbor["id"]])
+                get_home_sections.cache_clear()
+        except Exception as e:
+            flash(f"Error: {e}", "error")
+        return redirect(url_for("admin_homepage"))
+
+    # ── Home Page: section visibility + curated product picks ──────────────────
+
+    HOME_PRODUCT_SECTIONS = {
+        "bestsellers": "Best Sellers",
+        "men":         "Men's Eyewear",
+        "women":       "Women's Eyewear",
+        "kids":        "Kids' Eyewear",
+        "accessories": "Premium Accessories",
+        "sunglasses":  "Sunglasses",
+        "eyeglasses":  "Eyeglasses",
+    }
+    # "shape" used to live in a separate visibility checklist. It's now a real
+    # row in home_sections (id="shape") like everything else, managed straight
+    # from its own card on the Home Page screen (Edit + Live/Hidden toggle).
+
+    def _resolve_product_section(section_key):
+        """A product carousel is either one of the 7 built-in sections, or a custom
+        carousel (a home_sections row of type 'carousel', keyed by its own id).
+        Returns (label, is_builtin) or (None, None) if section_key is invalid."""
+        if section_key in HOME_PRODUCT_SECTIONS:
+            return HOME_PRODUCT_SECTIONS[section_key], True
+        row = db.query_one(
+            "SELECT title FROM home_sections WHERE id=? AND section_type='carousel'",
+            [section_key]
+        )
+        if row:
+            return row["title"], False
+        return None, None
+
+    @app.route("/admin/homepage/products/<section_key>")
+    @require_admin
+    def admin_homepage_products(section_key):
+        label, is_builtin = _resolve_product_section(section_key)
+        if label is None:
+            abort(404)
+        q = request.args.get("q", "").strip()
+        picks = get_home_product_picks_admin(section_key)
+        picked_ids = {p["product_id"] for p in picks}
+        results = []
+        if q:
+            results = [r for r in get_products(search=q, limit=20) if r["id"] not in picked_ids]
+        return render_template(
+            "admin/homepage_products.html",
+            section_key=section_key, section_label=label, is_builtin=is_builtin,
+            picks=picks, results=results, q=q
+        )
+
+    @app.route("/admin/homepage/products/<section_key>/add", methods=["POST"])
+    @require_admin
+    def admin_homepage_products_add(section_key):
+        label, _ = _resolve_product_section(section_key)
+        if label is None:
+            abort(404)
+        product_id = request.form.get("product_id")
+        q = request.form.get("q", "")
+        try:
+            if product_id:
+                existing = db.query_one(
+                    "SELECT id FROM home_product_picks WHERE section_key=? AND product_id=?",
+                    [section_key, product_id]
+                )
+                if not existing:
+                    row = db.query_one(
+                        "SELECT COALESCE(MAX(sort_order), -1) AS m FROM home_product_picks WHERE section_key=?",
+                        [section_key]
+                    )
+                    next_order = (row["m"] if row else -1) + 1
+                    db.execute(
+                        "INSERT INTO home_product_picks (id, section_key, product_id, sort_order) VALUES (?,?,?,?)",
+                        [str(uuid.uuid4()), section_key, product_id, next_order]
+                    )
+                    get_home_product_picks.cache_clear()
+                    flash("Product added.", "success")
+        except Exception as e:
+            flash(f"Error: {e}", "error")
+        return redirect(url_for("admin_homepage_products", section_key=section_key, q=q))
+
+    @app.route("/admin/homepage/products/pick/<pick_id>/remove", methods=["POST"])
+    @require_admin
+    def admin_homepage_products_remove(pick_id):
+        pick = db.query_one("SELECT * FROM home_product_picks WHERE id=?", [pick_id])
+        if not pick:
+            abort(404)
+        try:
+            db.execute("DELETE FROM home_product_picks WHERE id=?", [pick_id])
+            get_home_product_picks.cache_clear()
+            flash("Product removed.", "success")
+        except Exception as e:
+            flash(f"Error: {e}", "error")
+        return redirect(url_for("admin_homepage_products", section_key=pick["section_key"]))
+
+    @app.route("/admin/homepage/products/pick/<pick_id>/move/<direction>", methods=["POST"])
+    @require_admin
+    def admin_homepage_products_move(pick_id, direction):
+        if direction not in ("up", "down"):
+            abort(404)
+        pick = db.query_one("SELECT * FROM home_product_picks WHERE id=?", [pick_id])
+        if not pick:
+            abort(404)
+        try:
+            if direction == "up":
+                neighbor = db.query_one(
+                    "SELECT * FROM home_product_picks WHERE section_key=? AND sort_order < ? ORDER BY sort_order DESC LIMIT 1",
+                    [pick["section_key"], pick["sort_order"]]
+                )
+            else:
+                neighbor = db.query_one(
+                    "SELECT * FROM home_product_picks WHERE section_key=? AND sort_order > ? ORDER BY sort_order ASC LIMIT 1",
+                    [pick["section_key"], pick["sort_order"]]
+                )
+            if neighbor:
+                with db.transaction() as tx:
+                    tx.execute("UPDATE home_product_picks SET sort_order=? WHERE id=?", [neighbor["sort_order"], pick["id"]])
+                    tx.execute("UPDATE home_product_picks SET sort_order=? WHERE id=?", [pick["sort_order"], neighbor["id"]])
+                get_home_product_picks.cache_clear()
+        except Exception as e:
+            flash(f"Error: {e}", "error")
+        return redirect(url_for("admin_homepage_products", section_key=pick["section_key"]))
+
+    @app.route("/admin/homepage/products/<section_key>/reset", methods=["POST"])
+    @require_admin
+    def admin_homepage_products_reset(section_key):
+        label, _ = _resolve_product_section(section_key)
+        if label is None:
+            abort(404)
+        try:
+            db.execute("DELETE FROM home_product_picks WHERE section_key=?", [section_key])
+            get_home_product_picks.cache_clear()
+            flash("Products cleared.", "success")
+        except Exception as e:
+            flash(f"Error: {e}", "error")
+        return redirect(url_for("admin_homepage_products", section_key=section_key))
+
     # ── Settings ───────────────────────────────────────────────────────────────
 
     @app.route("/admin/settings", methods=["GET", "POST"])
@@ -1302,7 +1692,12 @@ def register(app):
     def admin_settings():
         if request.method == "POST":
             toggle_keys  = ["cod_enabled", "online_payment_enabled", "free_shipping_enabled", "free_shipping_all"]
-            text_keys    = ["razorpay_key_id", "razorpay_key_secret"]
+            text_keys    = [
+                "razorpay_key_id", "razorpay_key_secret",
+                "ithink_access_token", "ithink_secret_key", "ithink_pickup_address_id",
+                "ithink_return_address_id", "ithink_logistics_partner", "ithink_default_weight_kg",
+                "ithink_service_type",
+            ]
             numeric_keys = ["shipping_fee", "free_shipping_threshold"]
             try:
                 for key in toggle_keys:

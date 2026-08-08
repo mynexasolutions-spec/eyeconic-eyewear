@@ -115,9 +115,9 @@
         <div style="width:40px; height:40px; border-radius:8px; overflow:hidden; border:1px solid var(--admin-border); flex-shrink:0; background:white;">
           <img src="{{ resolve_image(p.image_url) }}" alt="{{ p.name }}" style="width:100%; height:100%; object-fit:contain; padding:2px;" onerror="this.src='{{ url_for('static', filename='images/placeholder.png') }}'" />
         </div>
-        <div style="min-width:0;">
-          <div style="font-size:0.875rem; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ p.name }}</div>
-          <div style="font-size:0.75rem; color:var(--admin-text-muted);">{{ p.sku }} • <span class="text-indigo">₹{{ "%.0f"|format(p.sale_price or p.price) }}</span></div>
+        <div style="min-width:0; flex:1;">
+          <div style="font-size:0.875rem; font-weight:600; line-height:1.3; margin-bottom:0.2rem; white-space:normal; word-break:break-word;">{{ p.name }}</div>
+          <div style="font-size:0.75rem; color:var(--admin-text-muted); word-break:break-all;">{{ p.sku }} • <span class="text-indigo">₹{{ "%.0f"|format(p.sale_price or p.price) }}</span></div>
         </div>
       </div>
       {% endfor %}

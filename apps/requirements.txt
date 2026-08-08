@@ -10,4 +10,5 @@ gunicorn==22.0.0
 cloudinary==1.40.0
 markupsafe==2.1.5
 razorpay==1.4.2
+requests==2.32.3
 setuptools>=60.0.0

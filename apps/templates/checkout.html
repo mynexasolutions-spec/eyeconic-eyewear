@@ -77,11 +77,31 @@
   .badge-red    { background: #FFEBEE; color: #C62828; }
 </style>
 <style>
+  :root {
+    --text-main: var(--charcoal);
+    --text-muted: var(--mid-gray);
+    --border-glass: var(--light-gray);
+    --primary: var(--gold);
+  }
+  .checkout-card {
+    background: #fff;
+    border: 1px solid var(--border-glass);
+    border-radius: 8px;
+    padding: 2rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+    width: 100%;
+    box-sizing: border-box;
+  }
   .checkout-grid {
     display:grid; grid-template-columns:1fr 420px; gap:2rem; align-items:start;
+    width: 100%;
   }
   @media(max-width:900px) {
-    .checkout-grid { grid-template-columns:1fr; }
+    .checkout-grid {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+    }
     .order-summary-sticky { position:static !important; }
   }
   @media(max-width:520px) {
@@ -92,27 +112,27 @@
   .field-group { display:flex; flex-direction:column; gap:0.4rem; }
   .field-group label { font-size:0.82rem; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:0.05em; }
   .field-input {
-    padding:0.75rem 1rem; background:rgba(255,255,255,0.05); border:1px solid var(--border-glass);
+    padding:0.75rem 1rem; background:#fff; border:1px solid var(--border-glass);
     border-radius:0.625rem; color:var(--text-main); font-size:0.95rem; outline:none;
     transition:border-color 0.2s; font-family:inherit; width:100%; box-sizing:border-box;
   }
   .field-input:focus { border-color:var(--primary); }
   .form-row-2 { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
-  @media(max-width:520px) { .form-row-2 { grid-template-columns:1fr; } }
+  @media(max-width:768px) { .form-row-2 { grid-template-columns:1fr; } }
   .payment-option {
     display:flex; align-items:flex-start; gap:0.875rem; padding:1.1rem 1.25rem;
     border:2px solid var(--border-glass); border-radius:0.875rem; cursor:pointer;
-    transition:border-color 0.2s; background:rgba(255,255,255,0.02);
+    transition:border-color 0.2s; background:#fff;
   }
-  .payment-option:has(input:checked) { border-color:var(--primary); background:rgba(96,165,250,0.06); }
+  .payment-option:has(input:checked) { border-color:var(--primary); background:rgba(201,164,85,0.06); }
   .payment-option input[type="radio"] { accent-color:var(--primary); width:18px; height:18px; margin-top:2px; flex-shrink:0; }
   .saved-addr-card {
     border:2px solid var(--border-glass); border-radius:0.875rem; padding:1rem 1.25rem;
-    cursor:pointer; transition:border-color 0.2s; background:rgba(255,255,255,0.02);
+    cursor:pointer; transition:border-color 0.2s; background:#fff;
   }
-  .saved-addr-card:hover { border-color:rgba(96,165,250,0.5); }
-  .saved-addr-card.selected { border-color:var(--primary); background:rgba(96,165,250,0.06); }
-  .cart-summary-item { display:flex; gap:0.875rem; align-items:center; padding:0.75rem 0; border-bottom:1px solid rgba(255,255,255,0.06); }
+  .saved-addr-card:hover { border-color:rgba(201,164,85,0.5); }
+  .saved-addr-card.selected { border-color:var(--primary); background:rgba(201,164,85,0.06); }
+  .cart-summary-item { display:flex; gap:0.875rem; align-items:center; padding:0.75rem 0; border-bottom:1px solid var(--border-glass); }
 
   /* Coupon */
   .coupon-row { display:flex; gap:0.5rem; align-items:stretch; }
@@ -135,11 +155,30 @@
     display:none; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.25);
     border-radius:0.75rem; padding:0.875rem 1.1rem; color:#f87171; font-size:0.875rem; margin-top:0.75rem;
   }
+  
+  @media(max-width:480px) {
+    .coupon-row {
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .coupon-btn {
+      width: 100%;
+      text-align: center;
+      padding: 0.8rem 1.1rem;
+    }
+    .payment-option {
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .payment-option input[type="radio"] {
+      margin-top: 0;
+    }
+  }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="checkout-outer" style="padding:2rem 2% 4rem; max-width:1200px; margin:0 auto; color:var(--text-main);">
+<div class="checkout-outer" style="padding:2rem 2% 4rem; max-width:1200px; width:100%; box-sizing:border-box; margin:0 auto; color:var(--text-main);">
 
   <div style="margin-bottom:1.75rem;">
     <nav style="font-size:0.85rem; color:var(--text-muted); margin-bottom:0.75rem;">
@@ -157,7 +196,7 @@
     <div class="checkout-grid">
 
       <!-- ══ LEFT COLUMN: ADDRESS + PAYMENT ══ -->
-      <div style="display:flex; flex-direction:column; gap:1.75rem;">
+      <div style="display:flex; flex-direction:column; gap:1.75rem; width:100%; box-sizing:border-box;">
 
         <!-- Delivery Address -->
         <div class="glass checkout-card" style="border-radius:1.5rem; padding:1.75rem;">
@@ -171,7 +210,7 @@
                   <div class="saved-addr-card {% if loop.first %}selected{% endif %}"
                     onclick='selectSavedAddress(this, {{ addr | tojson | safe }})'
                     data-addr='{{ addr | tojson | safe }}'>
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.35rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-bottom:0.35rem;">
                   <span style="font-weight:700; font-size:0.9rem; color:var(--primary);">{{ addr.label }}</span>
                   {% if addr.is_default %}<span style="font-size:0.7rem; background:var(--primary); color:white; padding:0.15rem 0.5rem; border-radius:999px; font-weight:700;">Default</span>{% endif %}
                 </div>
@@ -298,7 +337,7 @@
       </div>
 
       <!-- ══ RIGHT COLUMN: ORDER SUMMARY ══ -->
-      <div class="order-summary-sticky" style="position:sticky; top:90px;">
+      <div class="order-summary-sticky" style="position:sticky; top:90px; width:100%; box-sizing:border-box;">
         <div class="glass checkout-card" style="border-radius:1.5rem; padding:1.75rem;">
           <h2 style="font-size:1.15rem; font-weight:700; margin-bottom:1.5rem;">Order Summary</h2>
 
@@ -310,7 +349,7 @@
                 <img src="{{ resolve_image(item.image) }}" alt="{{ item.name }}" style="width:100%; height:100%; object-fit:contain;" loading="lazy" onerror="this.src='{{ url_for('static', filename='images/placeholder.png') }}'" />
               </div>
               <div style="flex:1; min-width:0;">
-                <div style="font-size:0.875rem; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ item.name }}</div>
+                <div style="font-size:0.875rem; font-weight:600; line-height:1.4; margin-bottom:0.2rem;">{{ item.name }}</div>
                 <div style="font-size:0.8rem; color:var(--text-muted);">Qty: {{ item.qty }}</div>
               </div>
               <div style="font-weight:700; font-size:0.9rem; white-space:nowrap;">₹{{ "%.0f"|format(item.price * item.qty) }}</div>

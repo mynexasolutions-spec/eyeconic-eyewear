@@ -77,147 +77,269 @@
   .badge-red    { background: #FFEBEE; color: #C62828; }
 </style>
 <style>
-  .success-icon {
-    width:72px; height:72px; background:rgba(34,197,94,0.15); border-radius:50%;
-    display:flex; align-items:center; justify-content:center; margin:0 auto 1.5rem;
+  :root {
+    --text-main: var(--charcoal);
+    --text-muted: var(--mid-gray);
+    --border-glass: var(--light-gray);
+    --primary: var(--gold);
   }
-  .order-detail-row { display:flex; justify-content:space-between; padding:0.6rem 0; border-bottom:1px solid rgba(255,255,255,0.06); font-size:0.9rem; }
-  .order-item-row { display:flex; gap:1rem; align-items:center; padding:0.875rem 0; border-bottom:1px solid rgba(255,255,255,0.06); }
-  .status-badge { display:inline-block; padding:0.3rem 0.875rem; border-radius:999px; font-size:0.78rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; }
-  .status-pending { background:rgba(251,191,36,0.15); color:#fbbf24; }
-  .status-processing { background:rgba(96,165,250,0.15); color:#60a5fa; }
-  .status-shipped { background:rgba(167,139,250,0.15); color:#a78bfa; }
-  .status-delivered { background:rgba(34,197,94,0.15); color:#22c55e; }
-  .status-cancelled { background:rgba(239,68,68,0.15); color:#ef4444; }
+  .glass {
+    background: #fff;
+    border: 1px solid var(--border-glass);
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+    padding: 1.75rem;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .glass:hover {
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.04);
+  }
+  .success-icon {
+    width: 80px;
+    height: 80px;
+    background: rgba(34, 197, 94, 0.08);
+    border: 2px solid rgba(34, 197, 94, 0.2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.5rem;
+    animation: scaleIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  @keyframes scaleIn {
+    0% { transform: scale(0.8); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  .order-detail-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.8rem 0;
+    border-bottom: 1px solid var(--border-glass);
+    font-size: 0.9rem;
+  }
+  .order-item-row {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--border-glass);
+  }
+  .status-badge {
+    display: inline-block;
+    padding: 0.3rem 0.875rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .status-pending { background: rgba(251, 191, 36, 0.1); color: #b8934e; }
+  .status-processing { background: rgba(96, 165, 250, 0.1); color: #3b82f6; }
+  .status-shipped { background: rgba(167, 139, 250, 0.1); color: #8b5cf6; }
+  .status-delivered { background: rgba(34, 197, 94, 0.1); color: #22c55e; }
+  .status-cancelled { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+
+  .success-layout-grid {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 1.5rem;
+    align-items: start;
+    margin-bottom: 2rem;
+    width: 100%;
+  }
+  .success-left-col {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    width: 100%;
+  }
+  .success-right-col {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    width: 100%;
+  }
+  @media (max-width: 900px) {
+    .success-layout-grid {
+      grid-template-columns: 1fr;
+      gap: 1.25rem;
+    }
+    .success-left-col,
+    .success-right-col {
+      display: contents;
+    }
+    .success-banner-card { order: 1; }
+    .items-ordered-card { order: 2; }
+    .order-details-card { order: 3; }
+    .shipping-address-card { order: 4; }
+    .cod-banner-card { order: 5; }
+    .action-buttons-card { order: 6; }
+  }
 
   @media (max-width: 600px) {
-    .success-details-grid {
-      grid-template-columns: 1fr !important;
+    .action-buttons-card {
+      flex-direction: column !important;
+    }
+    .glass-btn-professional,
+    .btn-primary {
+      width: 100% !important;
+      text-align: center;
+      box-sizing: border-box;
+      flex: none !important;
+    }
+    .glass {
+      padding: 1.25rem !important;
     }
   }
 
-  .pay-status-paid { color: #22c55e; }
-  .pay-status-pending { color: #fbbf24; }
+  .pay-status-paid { color: #22c55e; font-weight: 700; }
+  .pay-status-pending { color: #b8934e; font-weight: 700; }
+
+  .glass-btn-professional {
+    display: inline-block;
+    border: 1.5px solid var(--charcoal);
+    color: var(--charcoal);
+    background: transparent;
+    padding: 14px 32px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    font-size: 0.82rem;
+    letter-spacing: 0.16em;
+    font-weight: 600;
+    text-decoration: none;
+    transition: background 0.2s, color 0.2s, transform 0.15s;
+  }
+  .glass-btn-professional:hover {
+    background: var(--charcoal);
+    color: #fff;
+    transform: translateY(-1px);
+  }
 </style>
 {% endblock %}
 
 {% block content %}
-<div style="padding:2rem 2% 4rem; max-width:780px; margin:0 auto; color:var(--text-main);">
+<div style="padding:2rem 2% 4rem; max-width:1200px; width:100%; box-sizing:border-box; margin:0 auto; color:var(--text-main);">
 
-  <!-- Success Banner -->
-  <div class="glass section-fade" style="border-radius:1.5rem; padding:2.5rem 2rem; text-align:center; margin-bottom:2rem; border:1px solid rgba(34,197,94,0.25);">
-    <div class="success-icon">
-      <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" fill="none" viewBox="0 0 24 24" stroke="#22c55e" stroke-width="2.5">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-      </svg>
-    </div>
-    <h1 style="font-size:1.9rem; font-weight:800; font-family:var(--font-heading); margin-bottom:0.625rem;">Order Confirmed!</h1>
-    <p style="color:var(--text-muted); font-size:1rem; max-width:460px; margin:0 auto 1.25rem;">
-      Thank you for your order. We've received your request and will process it shortly.
-    </p>
-    <div style="display:inline-flex; align-items:center; gap:0.5rem; background:rgba(255,255,255,0.06); padding:0.5rem 1.25rem; border-radius:999px;">
-      <span style="font-size:0.8rem; color:var(--text-muted);">Order ID:</span>
-      <span style="font-family:monospace; font-weight:700; font-size:0.9rem; color:var(--primary);">#{{ order.id | string | upper }}</span>
-    </div>
-  </div>
+  <div class="success-layout-grid">
+    
+    <!-- Left Column (Primary Confirmation & Delivery Details) -->
+    <div class="success-left-col">
+      <!-- Success Banner -->
+      <div class="glass section-fade success-banner-card" style="border-radius:1.5rem; padding:2.25rem 2rem; text-align:center; border:1px solid rgba(34,197,94,0.25);">
+        <div class="success-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" fill="none" viewBox="0 0 24 24" stroke="#22c55e" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+          </svg>
+        </div>
+        <h1 style="font-size:1.9rem; font-weight:800; font-family:var(--font-heading); margin-bottom:0.625rem;">Order Confirmed!</h1>
+        <p style="color:var(--text-muted); font-size:0.95rem; max-width:460px; margin:0 auto 1.25rem; line-height:1.5;">
+          Thank you for your order. We've received your request and will process it shortly.
+        </p>
+        <div style="display:inline-flex; align-items:center; gap:0.5rem; background:rgba(0,0,0,0.03); padding:0.5rem 1.25rem; border-radius:999px; border:1px solid var(--border-glass);">
+          <span style="font-size:0.8rem; color:var(--text-muted);">Order ID:</span>
+          <span style="font-family:monospace; font-weight:700; font-size:0.9rem; color:var(--primary);">#{{ order.id | string | upper }}</span>
+        </div>
+      </div>
 
-  <div class="success-details-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; margin-bottom:1.5rem;">
+      <!-- Shipping Address -->
+      {% if shipping_address %}
+      <div class="glass section-fade shipping-address-card" style="border-radius:1.25rem; padding:1.5rem;">
+        <h3 style="font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; font-size:0.8rem; margin-bottom:1rem; border-bottom:1px solid var(--border-glass); padding-bottom:0.5rem;">Shipping Address</h3>
+        <div style="font-size:0.9rem; line-height:1.7; color:var(--text-main);">
+          <div style="font-weight:700; margin-bottom:0.25rem;">{{ shipping_address.first_name }} {{ shipping_address.last_name }}</div>
+          {% if shipping_address.phone %}<div style="color:var(--text-muted); margin-bottom:0.25rem;">{{ shipping_address.phone }}</div>{% endif %}
+          <div>{{ shipping_address.address_line1 }}</div>
+          {% if shipping_address.address_line2 %}<div>{{ shipping_address.address_line2 }}</div>{% endif %}
+          <div>{{ shipping_address.city }}{% if shipping_address.state %}, {{ shipping_address.state }}{% endif %}</div>
+          <div>{{ shipping_address.pincode }}{% if shipping_address.country %} – {{ shipping_address.country }}{% endif %}</div>
+        </div>
+      </div>
+      {% endif %}
 
-    <!-- Order Details -->
-    <div class="glass section-fade" style="border-radius:1.25rem; padding:1.5rem;">
-      <h3 style="font-size:1rem; font-weight:700; margin-bottom:1rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; font-size:0.8rem;">Order Details</h3>
-      <div class="order-detail-row">
-        <span style="color:var(--text-muted);">Status</span>
-        {% set status_class = 'status-' ~ order.status %}
-        <span class="status-badge {{ status_class }}">{{ order.status }}</span>
+      <!-- COD note if applicable -->
+      {% if order.payment_method == 'cod' %}
+      <div class="cod-banner-card" style="background:rgba(251,191,36,0.08); border:1px solid rgba(251,191,36,0.25); border-radius:1.25rem; padding:1rem 1.25rem; font-size:0.88rem; color:#b8934e; display:flex; gap:0.75rem; align-items:flex-start;">
+        <span style="font-size:1.1rem; flex-shrink:0;">💰</span>
+        <span>This is a Cash on Delivery order. Amount due at delivery: ₹{{ "%.0f"|format(order.total_amount) }}.</span>
       </div>
-      <div class="order-detail-row">
-        <span style="color:var(--text-muted);">Payment</span>
-        <span style="font-weight:600; text-transform:uppercase; font-size:0.85rem;">{{ order.payment_method or 'COD' }}</span>
-      </div>
-      <div class="order-detail-row">
-        <span style="color:var(--text-muted);">Payment Status</span>
-        {% set pay_class = 'pay-status-paid' if order.payment_status == 'paid' else 'pay-status-pending' %}
-        <span style="font-weight:600; font-size:0.85rem;" class="{{ pay_class }}">
-          {{ (order.payment_status or 'pending') | title }}
-        </span>
-      </div>
-      <div class="order-detail-row" style="border:none;">
-        <span style="color:var(--text-muted);">Date</span>
-        <span>{{ order.created_at.strftime('%d %b %Y, %I:%M %p') if order.created_at else '—' }}</span>
-      </div>
-    </div>
+      {% endif %}
 
-    <!-- Shipping Address -->
-    {% if shipping_address %}
-    <div class="glass section-fade" style="border-radius:1.25rem; padding:1.5rem;">
-      <h3 style="font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; font-size:0.8rem; margin-bottom:1rem;">Shipping Address</h3>
-      <div style="font-size:0.9rem; line-height:1.7; color:var(--text-main);">
-        <div style="font-weight:700;">{{ shipping_address.first_name }} {{ shipping_address.last_name }}</div>
-        {% if shipping_address.phone %}<div style="color:var(--text-muted);">{{ shipping_address.phone }}</div>{% endif %}
-        <div>{{ shipping_address.address_line1 }}</div>
-        {% if shipping_address.address_line2 %}<div>{{ shipping_address.address_line2 }}</div>{% endif %}
-        <div>{{ shipping_address.city }}{% if shipping_address.state %}, {{ shipping_address.state }}{% endif %}</div>
-        <div>{{ shipping_address.pincode }}{% if shipping_address.country %} – {{ shipping_address.country }}{% endif %}</div>
+      <!-- Action buttons inside left column -->
+      <div class="action-buttons-card" style="display:flex; gap:1rem; flex-wrap:wrap; margin-top:0.5rem;">
+        <a href="{{ url_for('public.shop') }}" class="glass-btn-professional" style="flex:1; padding:0.875rem 1.5rem; border-radius:0.75rem; text-decoration:none; font-weight:600; font-size:0.9rem; text-align:center;">
+          Continue Shopping
+        </a>
+        <a href="{{ url_for('auth.account') }}#orders" class="btn-primary" style="flex:1; padding:0.875rem 1.5rem; border-radius:0.75rem; text-decoration:none; font-weight:600; font-size:0.9rem; text-align:center; color:white; background:var(--primary); display:inline-block;">
+          View My Orders
+        </a>
       </div>
     </div>
-    {% endif %}
-  </div>
 
-  <!-- Items Ordered -->
-  {% if items %}
-  <div class="glass section-fade" style="border-radius:1.25rem; padding:1.5rem; margin-bottom:1.5rem;">
-    <h3 style="font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; font-size:0.8rem; margin-bottom:1rem;">Items Ordered</h3>
-    {% for item in items %}
-    <div class="order-item-row">
-      <div style="width:56px; height:56px; background:white; border-radius:0.5rem; overflow:hidden; flex-shrink:0; display:flex; align-items:center; justify-content:center; padding:0.25rem;">
-        {% set placeholder_url = url_for('static', filename='images/placeholder.png') %}
-        {% set item_img = resolve_image(item.image_url) %}
-        {% set item_alt = item.product_name_snapshot or item.product_name %}
-        <img src="{{ item_img }}" alt="{{ item_alt }}"
-             style="width:100%; height:100%; object-fit:contain;"
-             onerror="this.src='{{ placeholder_url }}'" />
+    <!-- Right Column (Order Summary Receipts) -->
+    <div class="success-right-col">
+      
+      <!-- Items Ordered -->
+      {% if items %}
+      <div class="glass section-fade items-ordered-card" style="border-radius:1.25rem; padding:1.5rem;">
+        <h3 style="font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; font-size:0.8rem; margin-bottom:1rem; border-bottom:1px solid var(--border-glass); padding-bottom:0.5rem;">Items Ordered</h3>
+        {% for item in items %}
+        <div class="order-item-row" {% if loop.last %}style="border-bottom:none;"{% endif %}>
+          <div style="width:52px; height:52px; background:white; border-radius:0.5rem; overflow:hidden; flex-shrink:0; display:flex; align-items:center; justify-content:center; padding:0.25rem; border:1px solid var(--border-glass);">
+            {% set placeholder_url = url_for('static', filename='images/placeholder.png') %}
+            {% set item_img = resolve_image(item.image_url) %}
+            {% set item_alt = item.product_name_snapshot or item.product_name %}
+            <img src="{{ item_img }}" alt="{{ item_alt }}"
+                 style="width:100%; height:100%; object-fit:contain;"
+                 onerror="this.src='{{ placeholder_url }}'" />
+          </div>
+          <div style="flex:1; min-width:0;">
+            <div style="font-weight:600; font-size:0.875rem; line-height:1.4; margin-bottom:0.15rem; white-space:normal; word-break:break-word;">{{ item.product_name_snapshot or item.product_name or 'Product' }}</div>
+            <div style="color:var(--text-muted); font-size:0.78rem;">Qty: {{ item.quantity or 1 }}</div>
+          </div>
+          <div style="font-weight:700; font-size:0.875rem; white-space:nowrap; margin-left:1rem;">₹{{ "%.0f"|format(item.total_price or item.unit_price or 0) }}</div>
+        </div>
+        {% endfor %}
+
+        <!-- Total -->
+        <div style="display:flex; justify-content:space-between; padding-top:1rem; border-top:1px solid var(--border-glass); gap:1rem; align-items:center; margin-top:0.5rem;">
+          <span style="color:var(--text-muted); font-weight:600; font-size:0.9rem;">Order Total:</span>
+          <span style="font-size:1.2rem; font-weight:800; color:var(--primary);">₹{{ "%.0f"|format(order.total_amount) }}</span>
+        </div>
       </div>
-      <div style="flex:1;">
-        <div style="font-weight:600; font-size:0.95rem;">{{ item.product_name_snapshot or item.product_name or 'Product' }}</div>
-        <div style="color:var(--text-muted); font-size:0.82rem; margin-top:0.2rem;">Qty: {{ item.quantity or 1 }}</div>
+      {% endif %}
+
+      <!-- Order Details -->
+      <div class="glass section-fade order-details-card" style="border-radius:1.25rem; padding:1.5rem;">
+        <h3 style="font-size:1rem; font-weight:700; margin-bottom:1rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; font-size:0.8rem; border-bottom:1px solid var(--border-glass); padding-bottom:0.5rem;">Order Details</h3>
+        <div class="order-detail-row">
+          <span style="color:var(--text-muted);">Status</span>
+          {% set status_class = 'status-' ~ order.status %}
+          <span class="status-badge {{ status_class }}">{{ order.status }}</span>
+        </div>
+        <div class="order-detail-row">
+          <span style="color:var(--text-muted);">Payment</span>
+          <span style="font-weight:600; text-transform:uppercase; font-size:0.85rem;">{{ order.payment_method or 'COD' }}</span>
+        </div>
+        <div class="order-detail-row">
+          <span style="color:var(--text-muted);">Payment Status</span>
+          {% set pay_class = 'pay-status-paid' if order.payment_status == 'paid' else 'pay-status-pending' %}
+          <span style="font-weight:600; font-size:0.85rem;" class="{{ pay_class }}">
+            {{ (order.payment_status or 'pending') | title }}
+          </span>
+        </div>
+        <div class="order-detail-row" {% if not order.notes %}style="border:none;"{% endif %}>
+          <span style="color:var(--text-muted);">Date</span>
+          <span>{{ order.created_at.strftime('%d %b %Y, %I:%M %p') if order.created_at else '—' }}</span>
+        </div>
+        {% if order.notes %}
+        <div class="order-detail-row" style="border:none; flex-direction:column; align-items:flex-start; gap:0.25rem; padding-bottom:0;">
+          <span style="color:var(--text-muted);">Order Notes</span>
+          <span style="font-size:0.85rem; line-height:1.4; color:var(--text-main); font-style:italic; font-weight:500;">{{ order.notes }}</span>
+        </div>
+        {% endif %}
       </div>
-      <div style="font-weight:700; font-size:0.95rem;">₹{{ "%.0f"|format(item.total_price or item.unit_price or 0) }}</div>
-    </div>
-    {% endfor %}
 
-    <!-- Total -->
-    <div style="display:flex; justify-content:flex-end; padding-top:1rem; gap:1rem; align-items:center;">
-      <span style="color:var(--text-muted);">Order Total:</span>
-      <span style="font-size:1.3rem; font-weight:800; color:var(--primary);">₹{{ "%.0f"|format(order.total_amount) }}</span>
     </div>
   </div>
-  {% endif %}
-
-  {% if order.notes %}
-  <div class="glass section-fade" style="border-radius:1.25rem; padding:1.25rem 1.5rem; margin-bottom:1.5rem;">
-    <span style="font-size:0.8rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:0.05em;">Order Notes</span>
-    <p style="margin-top:0.5rem; font-size:0.9rem; color:var(--text-main);">{{ order.notes }}</p>
-  </div>
-  {% endif %}
-
-  <!-- COD note if applicable -->
-  {% if order.payment_method == 'cod' %}
-  <div style="background:rgba(251,191,36,0.08); border:1px solid rgba(251,191,36,0.25); border-radius:1rem; padding:1rem 1.25rem; margin-bottom:1.5rem; font-size:0.88rem; color:#fbbf24; display:flex; gap:0.75rem; align-items:flex-start;">
-    <span style="font-size:1.1rem; flex-shrink:0;">💰</span>
-    <span>This is a Cash on Delivery order. Amount due at delivery: ₹{{ "%.0f"|format(order.total_amount) }}.</span>
-  </div>
-  {% endif %}
-
-  <!-- Action buttons -->
-  <div style="display:flex; gap:1rem; flex-wrap:wrap; justify-content:center;">
-    <a href="{{ url_for('public.shop') }}" class="glass-btn-professional" style="padding:0.875rem 2rem; border-radius:0.75rem; text-decoration:none; font-weight:600; font-size:0.95rem; display:inline-block;">
-      Continue Shopping
-    </a>
-    <a href="{{ url_for('auth.account') }}#orders" class="btn-primary" style="padding:0.875rem 2rem; border-radius:0.75rem; text-decoration:none; font-weight:600; font-size:0.95rem; display:inline-block;">
-      View My Orders
-    </a>
-  </div>
-
 </div>
 {% endblock %}

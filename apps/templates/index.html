@@ -1865,52 +1865,31 @@
   {% include 'partials/_navbar.html' %}
 
   <!-- DESKTOP HERO -->
+  {% if home_visible.hero %}
   <section class="hero-desktop" style="padding:0;">
     <div class="hero-slides">
-      <div class="hero-slide active">
-        <img src="https://images.unsplash.com/photo-1526045612212-70caf35c14df?w=1600&q=85&auto=format&fit=crop"
-          alt="Luxury eyewear" loading="eager">
+      {% for slide in hero_slides %}
+      <div class="hero-slide{% if loop.first %} active{% endif %}">
+        <img src="{{ resolve_image(slide.image_url) }}"
+          alt="{{ slide.title }}" loading="{{ 'eager' if loop.first else 'lazy' }}">
         <div class="slide-overlay"></div>
         <div class="hero-content">
-          <div class="hero-badge">New Collection 2025</div>
-          <h1 class="hero-title">See The World<br><em>Differently</em></h1>
-          <p class="hero-sub">Premium eyewear crafted for those who refuse to blend in. Handcrafted frames that define
-            your identity.</p>
-          <div class="hero-ctas"><a href="{{ url_for('public.shop') }}" class="btn-primary">Shop Now</a><a
-              href="{{ url_for('public.shop') }}" class="btn-outline">Explore Collection</a></div>
+          {% if slide.badge_text %}<div class="hero-badge">{{ slide.badge_text }}</div>{% endif %}
+          <h1 class="hero-title">{{ slide.title }}{% if slide.subtitle %}<br><em>{{ slide.subtitle }}</em>{% endif %}</h1>
+          {% if slide.body %}<p class="hero-sub">{{ slide.body }}</p>{% endif %}
+          <div class="hero-ctas">
+            {% if slide.cta_text %}<a href="{{ slide.cta_link or url_for('public.shop') }}" class="btn-primary">{{ slide.cta_text }}</a>{% endif %}
+            {% if slide.cta2_text %}<a href="{{ slide.cta2_link or url_for('public.shop') }}" class="btn-outline">{{ slide.cta2_text }}</a>{% endif %}
+          </div>
         </div>
       </div>
-      <div class="hero-slide">
-        <img src="https://images.unsplash.com/photo-1604537529428-15bcbeecfe4d?w=1600&q=85&auto=format&fit=crop"
-          alt="Accessories" loading="lazy">
-        <div class="slide-overlay"></div>
-        <div class="hero-content">
-          <div class="hero-badge">Accessories Collection</div>
-          <h1 class="hero-title">Complete Your<br><em>Look</em></h1>
-          <p class="hero-sub">Premium lens cleaners, microfiber cloths, and contact solutions to keep your vision crystal clear.</p>
-          <div class="hero-ctas"><a href="{{ url_for('public.shop', category='accessories') }}" class="btn-primary">Shop
-              Accessories</a><a href="{{ url_for('public.shop') }}" class="btn-outline">Learn More</a></div>
-        </div>
-      </div>
-      <div class="hero-slide">
-        <img src="https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=1600&q=85&auto=format&fit=crop"
-          alt="Sale" loading="lazy">
-        <div class="slide-overlay"></div>
-        <div class="hero-content">
-          <div class="hero-badge">Exclusive Sale — Up to 50% Off</div>
-          <h1 class="hero-title">Style For<br><em>Every Face</em></h1>
-          <p class="hero-sub">From classic round frames to bold wayfarers — discover the perfect pair that speaks to
-            your soul.</p>
-          <div class="hero-ctas"><a href="{{ url_for('public.shop', on_sale='1') }}" class="btn-primary">Shop Sale</a><a
-              href="{{ url_for('public.shop') }}" class="btn-outline">All Collections</a></div>
-        </div>
-      </div>
+      {% endfor %}
     </div>
 
     <div class="hero-dots">
-      <button class="hero-dot active" data-slide="0"></button>
-      <button class="hero-dot" data-slide="1"></button>
-      <button class="hero-dot" data-slide="2"></button>
+      {% for slide in hero_slides %}
+      <button class="hero-dot{% if loop.first %} active{% endif %}" data-slide="{{ loop.index0 }}"></button>
+      {% endfor %}
     </div>
     <button class="hero-arrow prev" id="hero-prev">&#8592;</button>
     <button class="hero-arrow next" id="hero-next">&#8594;</button>
@@ -1937,47 +1916,25 @@
   <!-- MOBILE HERO -->
   <div class="hero-mobile" id="hero-mobile">
     <div class="mobile-hero-slides">
-      <div class="mobile-hero-slide active">
+      {% for slide in hero_slides %}
+      <div class="mobile-hero-slide{% if loop.first %} active{% endif %}">
         <div class="mobile-hero-card">
-          <img src="https://images.unsplash.com/photo-1526045612212-70caf35c14df?w=800&q=80&auto=format&fit=crop"
-            alt="New Collection" loading="eager">
+          <img src="{{ resolve_image(slide.image_url) }}"
+            alt="{{ slide.title }}" loading="{{ 'eager' if loop.first else 'lazy' }}">
           <div class="mobile-hero-card-overlay"></div>
           <div class="mobile-hero-card-content">
-            <span class="mobile-hero-badge">New Collection 2025</span>
-            <div class="mobile-hero-title">See The World <em>Differently</em></div>
-            <a href="{{ url_for('public.shop') }}" class="mobile-hero-btn">Shop Now</a>
+            {% if slide.badge_text %}<span class="mobile-hero-badge">{{ slide.badge_text }}</span>{% endif %}
+            <div class="mobile-hero-title">{{ slide.title }}{% if slide.subtitle %} <em>{{ slide.subtitle }}</em>{% endif %}</div>
+            {% if slide.cta_text %}<a href="{{ slide.cta_link or url_for('public.shop') }}" class="mobile-hero-btn">{{ slide.cta_text }}</a>{% endif %}
           </div>
         </div>
       </div>
-      <div class="mobile-hero-slide">
-        <div class="mobile-hero-card">
-          <img src="https://images.unsplash.com/photo-1604537529428-15bcbeecfe4d?w=800&q=80&auto=format&fit=crop"
-            alt="Accessories" loading="lazy">
-          <div class="mobile-hero-card-overlay"></div>
-          <div class="mobile-hero-card-content">
-            <span class="mobile-hero-badge">Accessories Collection</span>
-            <div class="mobile-hero-title">Complete Your <em>Look</em></div>
-            <a href="{{ url_for('public.shop', category='accessories') }}" class="mobile-hero-btn">Shop Accessories</a>
-          </div>
-        </div>
-      </div>
-      <div class="mobile-hero-slide">
-        <div class="mobile-hero-card">
-          <img src="https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=800&q=80&auto=format&fit=crop"
-            alt="Sale" loading="lazy">
-          <div class="mobile-hero-card-overlay"></div>
-          <div class="mobile-hero-card-content">
-            <span class="mobile-hero-badge">Up to 50% Off</span>
-            <div class="mobile-hero-title">Style For <em>Every Face</em></div>
-            <a href="{{ url_for('public.shop', on_sale='1') }}" class="mobile-hero-btn">Shop Sale</a>
-          </div>
-        </div>
-      </div>
+      {% endfor %}
     </div>
     <div class="mobile-hero-dots">
-      <button class="mobile-hero-dot active" data-mslide="0"></button>
-      <button class="mobile-hero-dot" data-mslide="1"></button>
-      <button class="mobile-hero-dot" data-mslide="2"></button>
+      {% for slide in hero_slides %}
+      <button class="mobile-hero-dot{% if loop.first %} active{% endif %}" data-mslide="{{ loop.index0 }}"></button>
+      {% endfor %}
     </div>
     <div class="mobile-trust-pills">
       <div class="trust-pill"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--gold)"
@@ -1998,8 +1955,10 @@
         </svg>7 Day Returns</div>
     </div>
   </div>
+  {% endif %}
 
   <!-- CATEGORIES -->
+  {% if home_visible.category %}
   <section class="cat-section">
     <p class="section-label">Shop by Category</p>
     <div class="section-header-row">
@@ -2007,63 +1966,31 @@
     </div>
     <div class="section-line"></div>
     <div class="cat-grid-desktop">
-      <div class="cat-card" onclick='window.location.href="{{ url_for("public.shop", category="men") }}";'>
-        <img
-          src="{{ url_for('static', filename='images/man.webp') }}"
-          alt="Men">
+      {% for cat in home_categories %}
+      <div class="cat-card" onclick='window.location.href="{{ cat.cta_link or url_for("public.shop") }}";'>
+        <img src="{{ resolve_image(cat.image_url) }}" alt="{{ cat.title }}">
         <div class="cat-overlay"></div>
-        <div class="cat-label"><strong>Men</strong><a href="{{ url_for('public.shop', category='men') }}">Explore
-            Now</a></div>
+        <div class="cat-label"><strong>{{ cat.title }}</strong><a href="{{ cat.cta_link or url_for('public.shop') }}">{{ cat.cta_text or 'Explore Now' }}</a></div>
       </div>
-      <div class="cat-card" onclick='window.location.href="{{ url_for("public.shop", category="women") }}";'>
-        <img
-          src="{{ url_for('static', filename='images/woman.webp') }}"
-          alt="Women">
-        <div class="cat-overlay"></div>
-        <div class="cat-label"><strong>Women</strong><a href="{{ url_for('public.shop', category='women') }}">Explore
-            Now</a></div>
-      </div>
-      <div class="cat-card" onclick='window.location.href="{{ url_for("public.shop", category="kids") }}";'>
-        <img
-          src="{{ url_for('static', filename='images/kid.webp') }}"
-          alt="Kids">
-        <div class="cat-overlay"></div>
-        <div class="cat-label"><strong>Kids</strong><a href="{{ url_for('public.shop', category='kids') }}">Explore
-            Now</a></div>
-      </div>
+      {% endfor %}
     </div>
     <div class="cat-scroll-mobile" id="cat-scroll">
-      <div class="cat-card" onclick='window.location.href="{{ url_for("public.shop", category="men") }}";'>
-        <img
-          src="{{ url_for('static', filename='images/man.webp') }}"
-          alt="Men">
+      {% for cat in home_categories %}
+      <div class="cat-card" onclick='window.location.href="{{ cat.cta_link or url_for("public.shop") }}";'>
+        <img src="{{ resolve_image(cat.image_url) }}" alt="{{ cat.title }}">
         <div class="cat-overlay"></div>
-        <div class="cat-label"><strong>Men</strong><a href="{{ url_for('public.shop', category='men') }}">Explore</a>
-        </div>
+        <div class="cat-label"><strong>{{ cat.title }}</strong><a href="{{ cat.cta_link or url_for('public.shop') }}">{{ cat.cta_text or 'Explore' }}</a></div>
       </div>
-      <div class="cat-card" onclick='window.location.href="{{ url_for("public.shop", category="women") }}";'>
-        <img
-          src="{{ url_for('static', filename='images/woman.webp') }}"
-          alt="Women">
-        <div class="cat-overlay"></div>
-        <div class="cat-label"><strong>Women</strong><a
-            href="{{ url_for('public.shop', category='women') }}">Explore</a></div>
-      </div>
-      <div class="cat-card" onclick='window.location.href="{{ url_for("public.shop", category="kids") }}";'>
-        <img
-          src="{{ url_for('static', filename='images/kid.webp') }}"
-          alt="Kids">
-        <div class="cat-overlay"></div>
-        <div class="cat-label"><strong>Kids</strong><a href="{{ url_for('public.shop', category='kids') }}">Explore</a>
-        </div>
-      </div>
+      {% endfor %}
     </div>
   </section>
+  {% endif %}
 
   <!-- SHAPE SELECTOR -->
+  {% if home_visible.shape %}
   <section class="shapes-bg">
-    <p class="section-label">Shop by Shape</p>
-    <h2 class="section-title">Frames That Suit You</h2>
+    <p class="section-label">{{ home_shape.badge_text }}</p>
+    <h2 class="section-title">{{ home_shape.title }}</h2>
     <div class="section-line"></div>
     <div class="shapes-grid">
       {% for shape in trending_shapes %}
@@ -2086,15 +2013,17 @@
       {% endfor %}
     </div>
     <div style="text-align: center; margin-top: 3.5rem;">
-      <a href="{{ url_for('public.shop') }}" class="btn-primary" style="border-radius: 4px;">Explore Collection</a>
+      <a href="{{ home_shape.cta_link }}" class="btn-primary" style="border-radius: 4px;">{{ home_shape.cta_text }}</a>
     </div>
   </section>
+  {% endif %}
 
   <!-- BEST SELLERS -->
+  {% if home_visible.bestsellers %}
   <section>
-    <p class="section-label">Top Picks</p>
+    <p class="section-label">{{ builtin_carousels.bestsellers.badge_text }}</p>
     <div class="section-header-row">
-      <h2 class="section-title">Best Sellers</h2>
+      <h2 class="section-title">{{ builtin_carousels.bestsellers.title }}</h2>
     </div>
     <div class="section-line"></div>
     <div class="grid-wrapper" style="margin-top: 2.5rem;">
@@ -2131,43 +2060,29 @@
       {% endfor %}
       </div>
     </div>
-    <div class="section-top-bar"><a href="{{ url_for('public.shop', featured=1) }}" class="view-all">View All Best
-        Sellers</a></div>
+    <div class="section-top-bar"><a href="{{ builtin_carousels.bestsellers.cta_link }}" class="view-all">{{ builtin_carousels.bestsellers.cta_text }}</a></div>
   </section>
+  {% endif %}
 
   <!-- TRUST STATS -->
+  {% if home_stats %}
   <div class="trust-strip">
+    {% for stat in home_stats %}
     <div class="trust-stat">
-      <div class="val">50K+</div>
-      <div class="lbl">Happy Customers</div>
+      <div class="val">{{ stat.title }}</div>
+      <div class="lbl">{{ stat.subtitle }}</div>
     </div>
-    <div class="trust-divider"></div>
-    <div class="trust-stat">
-      <div class="val">4.8/5</div>
-      <div class="lbl">Average Rating</div>
-    </div>
-    <div class="trust-divider"></div>
-    <div class="trust-stat">
-      <div class="val">100+</div>
-      <div class="lbl">Premium Styles</div>
-    </div>
-    <div class="trust-divider"></div>
-    <div class="trust-stat">
-      <div class="val">20+</div>
-      <div class="lbl">Cities Delivered</div>
-    </div>
-    <div class="trust-divider"></div>
-    <div class="trust-stat">
-      <div class="val">99%</div>
-      <div class="lbl">Satisfaction Rate</div>
-    </div>
+    {% if not loop.last %}<div class="trust-divider"></div>{% endif %}
+    {% endfor %}
   </div>
+  {% endif %}
 
   <!-- MEN'S EYEWEAR -->
+  {% if home_visible.men %}
   <section class="cat-block">
-    <p class="section-label">For Him</p>
+    <p class="section-label">{{ builtin_carousels.men.badge_text }}</p>
     <div class="section-header-row">
-      <h2 class="section-title">Men's Eyewear</h2>
+      <h2 class="section-title">{{ builtin_carousels.men.title }}</h2>
     </div>
     <div class="section-line"></div>
     <div class="grid-wrapper" style="margin-top: 2.5rem;">
@@ -2198,15 +2113,16 @@
       {% endfor %}
       </div>
     </div>
-    <div class="section-top-bar"><a href="/shop?category=eyeglasses-men&category=sunglasses-men" class="view-all">View All
-        Men's</a></div>
+    <div class="section-top-bar"><a href="{{ builtin_carousels.men.cta_link }}" class="view-all">{{ builtin_carousels.men.cta_text }}</a></div>
   </section>
+  {% endif %}
 
   <!-- WOMEN'S EYEWEAR -->
+  {% if home_visible.women %}
   <section class="cat-block" style="background:var(--cream);">
-    <p class="section-label">For Her</p>
+    <p class="section-label">{{ builtin_carousels.women.badge_text }}</p>
     <div class="section-header-row">
-      <h2 class="section-title">Women's Eyewear</h2>
+      <h2 class="section-title">{{ builtin_carousels.women.title }}</h2>
     </div>
     <div class="section-line"></div>
     <div class="grid-wrapper" style="margin-top: 2.5rem;">
@@ -2237,15 +2153,16 @@
       {% endfor %}
       </div>
     </div>
-    <div class="section-top-bar"><a href="/shop?category=eyeglasses-women&category=sunglasses-women" class="view-all">View All
-        Women's</a></div>
+    <div class="section-top-bar"><a href="{{ builtin_carousels.women.cta_link }}" class="view-all">{{ builtin_carousels.women.cta_text }}</a></div>
   </section>
+  {% endif %}
 
   <!-- KIDS EYEWEAR -->
+  {% if home_visible.kids %}
   <section class="cat-block">
-    <p class="section-label">For Little Ones</p>
+    <p class="section-label">{{ builtin_carousels.kids.badge_text }}</p>
     <div class="section-header-row">
-      <h2 class="section-title">Kids' Eyewear</h2>
+      <h2 class="section-title">{{ builtin_carousels.kids.title }}</h2>
     </div>
     <div class="section-line"></div>
     <div class="grid-wrapper" style="margin-top: 2.5rem;">
@@ -2276,15 +2193,16 @@
       {% endfor %}
       </div>
     </div>
-    <div class="section-top-bar"><a href="/shop?category=eyeglasses-kids&category=sunglasses-kids" class="view-all">View All
-        Kids'</a></div>
+    <div class="section-top-bar"><a href="{{ builtin_carousels.kids.cta_link }}" class="view-all">{{ builtin_carousels.kids.cta_text }}</a></div>
   </section>
+  {% endif %}
 
   <!-- ACCESSORIES SECTION -->
+  {% if home_visible.accessories %}
   <section class="cat-block" style="background:var(--cream);">
-    <p class="section-label">Essential Care</p>
+    <p class="section-label">{{ builtin_carousels.accessories.badge_text }}</p>
     <div class="section-header-row">
-      <h2 class="section-title">Premium Accessories</h2>
+      <h2 class="section-title">{{ builtin_carousels.accessories.title }}</h2>
     </div>
     <div class="section-line"></div>
     <div class="grid-wrapper" style="margin-top: 2.5rem;">
@@ -2315,15 +2233,16 @@
       {% endfor %}
       </div>
     </div>
-    <div class="section-top-bar"><a href="{{ url_for('public.shop', category='accessories') }}" class="view-all">View
-        All</a></div>
+    <div class="section-top-bar"><a href="{{ builtin_carousels.accessories.cta_link }}" class="view-all">{{ builtin_carousels.accessories.cta_text }}</a></div>
   </section>
+  {% endif %}
 
   <!-- SUNGLASSES -->
+  {% if home_visible.sunglasses %}
   <section class="cat-block">
-    <p class="section-label">Sun Protection</p>
+    <p class="section-label">{{ builtin_carousels.sunglasses.badge_text }}</p>
     <div class="section-header-row">
-      <h2 class="section-title">Sunglasses</h2>
+      <h2 class="section-title">{{ builtin_carousels.sunglasses.title }}</h2>
     </div>
     <div class="section-line"></div>
     <div class="grid-wrapper" style="margin-top: 2.5rem;">
@@ -2354,15 +2273,16 @@
       {% endfor %}
       </div>
     </div>
-    <div class="section-top-bar"><a href="{{ url_for('public.shop', category='sunglasses') }}" class="view-all">View All
-        Sunglasses</a></div>
+    <div class="section-top-bar"><a href="{{ builtin_carousels.sunglasses.cta_link }}" class="view-all">{{ builtin_carousels.sunglasses.cta_text }}</a></div>
   </section>
+  {% endif %}
 
   <!-- EYEGLASSES / OPTICAL -->
+  {% if home_visible.eyeglasses %}
   <section class="cat-block" style="background:var(--cream);">
-    <p class="section-label">Prescription Ready</p>
+    <p class="section-label">{{ builtin_carousels.eyeglasses.badge_text }}</p>
     <div class="section-header-row">
-      <h2 class="section-title">Eyeglasses</h2>
+      <h2 class="section-title">{{ builtin_carousels.eyeglasses.title }}</h2>
     </div>
     <div class="section-line"></div>
     <div class="grid-wrapper" style="margin-top: 2.5rem;">
@@ -2393,9 +2313,51 @@
       {% endfor %}
       </div>
     </div>
-    <div class="section-top-bar"><a href="{{ url_for('public.shop', category='eyeglasses') }}" class="view-all">View All
-        Eyeglasses</a></div>
+    <div class="section-top-bar"><a href="{{ builtin_carousels.eyeglasses.cta_link }}" class="view-all">{{ builtin_carousels.eyeglasses.cta_text }}</a></div>
   </section>
+  {% endif %}
+
+  <!-- CUSTOM PRODUCT CAROUSELS (Admin > Home Page > Custom Product Carousels) -->
+  {% for carousel in home_carousels %}
+  <section class="cat-block">
+    {% if carousel.badge_text %}<p class="section-label">{{ carousel.badge_text }}</p>{% endif %}
+    <div class="section-header-row">
+      <h2 class="section-title">{{ carousel.title }}</h2>
+    </div>
+    <div class="section-line"></div>
+    <div class="grid-wrapper" style="margin-top: 2.5rem;">
+      <button class="side-arrow prev" onclick="scrollGrid(this, -1)">&#8592;</button>
+      <button class="side-arrow next" onclick="scrollGrid(this, 1)">&#8594;</button>
+      <div class="products-grid-2">
+        {% for p in carousel.products[:8] %}
+        <div class="product-card">
+          <div class="product-img"
+            onclick='window.location.href="{{ url_for("public.product_detail", product_id=p.id) }}";'>
+            <img src="{{ resolve_image(p.image_url) }}" alt="{{ p.name }}" loading="lazy" onerror="this.src='{{ url_for('static', filename='images/placeholder.png') }}'">
+            {% if p.sale_price and p.price > 0 %}
+            {% set discount = ((p.price - p.sale_price) / p.price * 100) | round | int %}
+            {% if discount > 0 %}<div class="product-badge">-{{ discount }}%</div>{% endif %}
+            {% endif %}
+          </div>
+          <div class="product-name"
+            onclick='window.location.href="{{ url_for("public.product_detail", product_id=p.id) }}";'>{{ p.name }}</div>
+          <div class="product-pricing">
+            {% if p.sale_price %}
+            <span class="product-price">₹{{ "{:,.0f}".format(p.sale_price) }}</span>
+            <span class="product-old">₹{{ "{:,.0f}".format(p.price) }}</span>
+            {% else %}
+            <span class="product-price">₹{{ "{:,.0f}".format(p.price) }}</span>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% if carousel.cta_text %}
+    <div class="section-top-bar"><a href="{{ carousel.cta_link or url_for('public.shop') }}" class="view-all">{{ carousel.cta_text }}</a></div>
+    {% endif %}
+  </section>
+  {% endfor %}
 
   <!-- POLICY -->
   <div class="policy-strip">
@@ -2428,259 +2390,86 @@
   </div>
 
   <!-- LIFESTYLE BANNER -->
+  {% if home_banners %}
+  {% set banner = home_banners[0] %}
   <div class="lifestyle-banner">
-    <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=1600&q=85&auto=format&fit=crop"
-      alt="Eyewear lifestyle">
+    <img src="{{ resolve_image(banner.image_url) }}" alt="{{ banner.title }}">
     <div class="lifestyle-overlay"></div>
     <div class="lifestyle-content">
-      <p class="section-label">Made For Every Moment</p>
-      <h2>Style That Fits<br><em>Every You</em></h2>
-      <p>From workdays to weekends, find eyewear that matches your vibe, your energy, your world.</p>
-      <a href="{{ url_for('public.shop') }}" class="btn-primary">Explore Collection</a>
+      {% if banner.badge_text %}<p class="section-label">{{ banner.badge_text }}</p>{% endif %}
+      <h2>{{ banner.title }}{% if banner.subtitle %}<br><em>{{ banner.subtitle }}</em>{% endif %}</h2>
+      {% if banner.body %}<p>{{ banner.body }}</p>{% endif %}
+      {% if banner.cta_text %}<a href="{{ banner.cta_link or url_for('public.shop') }}" class="btn-primary">{{ banner.cta_text }}</a>{% endif %}
     </div>
   </div>
+  {% endif %}
 
   <!-- REVIEWS -->
+  {% if home_testimonials %}
   <section>
     <p class="section-label">What Our Customers Say</p>
     <h2 class="section-title">Loved by Thousands</h2>
     <div class="section-line"></div>
     <div class="reviews-track-wrap">
       <div class="reviews-track" id="reviews-track">
+        {% for t in (home_testimonials * 2) %}
+        {% set _parts = (t.title or 'U').split() %}
         <div class="review-card">
-          <div class="stars">★★★★★</div>
-          <p class="review-text">The quality is outstanding and so comfortable to wear all day. These frames have
-            completely replaced all my old glasses. Highly recommended!</p>
+          <div class="stars">{{ '★' * (t.rating or 5) }}{{ '☆' * (5 - (t.rating or 5)) }}</div>
+          <p class="review-text">{{ t.body }}</p>
           <div class="reviewer">
-            <div class="reviewer-avatar">RS</div>
+            {% if t.image_url %}
+            <div class="reviewer-avatar" style="overflow:hidden; padding:0;"><img src="{{ resolve_image(t.image_url) }}" alt="{{ t.title }}" style="width:100%; height:100%; object-fit:cover;"></div>
+            {% else %}
+            <div class="reviewer-avatar">{{ (_parts[0][0] ~ (_parts[-1][0] if _parts|length > 1 else '')) | upper }}</div>
+            {% endif %}
             <div>
-              <div class="reviewer-name">Rohit Sharma</div>
-              <div class="reviewer-city">Mumbai</div>
+              <div class="reviewer-name">{{ t.title }}</div>
+              <div class="reviewer-city">{{ t.subtitle }}</div>
             </div>
           </div>
         </div>
-        <div class="review-card">
-          <div class="stars">★★★★★</div>
-          <p class="review-text">Stylish, lightweight and great packaging. My go-to eyewear brand now. The blue light
-            glasses really help with my screen time.</p>
-          <div class="reviewer">
-            <div class="reviewer-avatar">AV</div>
-            <div>
-              <div class="reviewer-name">Ananya Verma</div>
-              <div class="reviewer-city">Delhi</div>
-            </div>
-          </div>
-        </div>
-        <div class="review-card">
-          <div class="stars">★★★★★</div>
-          <p class="review-text">Fast delivery, premium packaging and amazing product quality. The aviator frames look
-            exactly like the photos. Will buy again!</p>
-          <div class="reviewer">
-            <div class="reviewer-avatar">KM</div>
-            <div>
-              <div class="reviewer-name">Karan Mehta</div>
-              <div class="reviewer-city">Bengaluru</div>
-            </div>
-          </div>
-        </div>
-        <div class="review-card">
-          <div class="stars">★★★★★</div>
-          <p class="review-text">Finally found blue light glasses that actually work and look good! I wear them every
-            day and my eye strain has reduced so much.</p>
-          <div class="reviewer">
-            <div class="reviewer-avatar">NK</div>
-            <div>
-              <div class="reviewer-name">Neha Kapoor</div>
-              <div class="reviewer-city">Pune</div>
-            </div>
-          </div>
-        </div>
-        <div class="review-card">
-          <div class="stars">★★★★★</div>
-          <p class="review-text">Absolutely love the cat-eye frames! Got so many compliments. The packaging was
-            beautiful and delivery was super fast.</p>
-          <div class="reviewer">
-            <div class="reviewer-avatar">PR</div>
-            <div>
-              <div class="reviewer-name">Priya Rao</div>
-              <div class="reviewer-city">Hyderabad</div>
-            </div>
-          </div>
-        </div>
-        <div class="review-card">
-          <div class="stars">★★★★★</div>
-          <p class="review-text">Best purchase this year. The sunglasses are premium quality and the polarised lenses
-            are incredible. Worth every rupee!</p>
-          <div class="reviewer">
-            <div class="reviewer-avatar">AK</div>
-            <div>
-              <div class="reviewer-name">Arjun Kumar</div>
-              <div class="reviewer-city">Chennai</div>
-            </div>
-          </div>
-        </div>
-        <div class="review-card">
-          <div class="stars">★★★★★</div>
-          <p class="review-text">Ordered the kids frames for my daughter and she absolutely loves them! Sturdy, flexible
-            and so cute. Great for school.</p>
-          <div class="reviewer">
-            <div class="reviewer-avatar">SM</div>
-            <div>
-              <div class="reviewer-name">Sunita Mehta</div>
-              <div class="reviewer-city">Jaipur</div>
-            </div>
-          </div>
-        </div>
-        <div class="review-card">
-          <div class="stars">★★★★★</div>
-          <p class="review-text">The quality is outstanding and so comfortable to wear all day. These frames have
-            completely replaced all my old glasses. Highly recommended!</p>
-          <div class="reviewer">
-            <div class="reviewer-avatar">RS</div>
-            <div>
-              <div class="reviewer-name">Rohit Sharma</div>
-              <div class="reviewer-city">Mumbai</div>
-            </div>
-          </div>
-        </div>
-        <div class="review-card">
-          <div class="stars">★★★★★</div>
-          <p class="review-text">Stylish, lightweight and great packaging. My go-to eyewear brand now. The blue light
-            glasses really help with my screen time.</p>
-          <div class="reviewer">
-            <div class="reviewer-avatar">AV</div>
-            <div>
-              <div class="reviewer-name">Ananya Verma</div>
-              <div class="reviewer-city">Delhi</div>
-            </div>
-          </div>
-        </div>
-        <div class="review-card">
-          <div class="stars">★★★★★</div>
-          <p class="review-text">Fast delivery, premium packaging and amazing product quality. The aviator frames look
-            exactly like the photos. Will buy again!</p>
-          <div class="reviewer">
-            <div class="reviewer-avatar">KM</div>
-            <div>
-              <div class="reviewer-name">Karan Mehta</div>
-              <div class="reviewer-city">Bengaluru</div>
-            </div>
-          </div>
-        </div>
-        <div class="review-card">
-          <div class="stars">★★★★★</div>
-          <p class="review-text">Finally found blue light glasses that actually work and look good! I wear them every
-            day and my eye strain has reduced so much.</p>
-          <div class="reviewer">
-            <div class="reviewer-avatar">NK</div>
-            <div>
-              <div class="reviewer-name">Neha Kapoor</div>
-              <div class="reviewer-city">Pune</div>
-            </div>
-          </div>
-        </div>
-        <div class="review-card">
-          <div class="stars">★★★★★</div>
-          <p class="review-text">Absolutely love the cat-eye frames! Got so many compliments. The packaging was
-            beautiful and delivery was super fast.</p>
-          <div class="reviewer">
-            <div class="reviewer-avatar">PR</div>
-            <div>
-              <div class="reviewer-name">Priya Rao</div>
-              <div class="reviewer-city">Hyderabad</div>
-            </div>
-          </div>
-        </div>
-        <div class="review-card">
-          <div class="stars">★★★★★</div>
-          <p class="review-text">Best purchase this year. The sunglasses are premium quality and the polarised lenses
-            are incredible. Worth every rupee!</p>
-          <div class="reviewer">
-            <div class="reviewer-avatar">AK</div>
-            <div>
-              <div class="reviewer-name">Arjun Kumar</div>
-              <div class="reviewer-city">Chennai</div>
-            </div>
-          </div>
-        </div>
-        <div class="review-card">
-          <div class="stars">★★★★★</div>
-          <p class="review-text">Ordered the kids frames for my daughter and she absolutely loves them! Sturdy, flexible
-            and so cute. Great for school.</p>
-          <div class="reviewer">
-            <div class="reviewer-avatar">SM</div>
-            <div>
-              <div class="reviewer-name">Sunita Mehta</div>
-              <div class="reviewer-city">Jaipur</div>
-            </div>
-          </div>
-        </div>
+        {% endfor %}
       </div>
     </div>
   </section>
+  {% endif %}
 
   <!-- INSTAGRAM -->
+  {% if home_visible.instagram %}
   <section class="insta-bg" style="padding-bottom:clamp(4rem,8vw,8rem);">
     <p class="section-label">Follow Us @eyeconiceyewear01</p>
     <h2 class="section-title">Be Part of the Community</h2>
     <div class="section-line"></div>
     <div class="insta-grid">
+      {% for tile in home_instagram %}
+      {% set _icon %}
+        <span class="insta-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+            <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+            <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+          </svg>
+        </span>
+      {% endset %}
+      {% if tile.link_url %}
+      <a class="insta-item" href="{{ tile.link_url }}" target="_blank" rel="noopener">
+        <img src="{{ resolve_image(tile.image_url) }}" alt="{{ tile.title or 'Community style' }}">
+        <div class="insta-overlay">{{ _icon }}</div>
+      </a>
+      {% else %}
       <div class="insta-item">
-        <img src="{{ url_for('static', filename='images/1.webp') }}" alt="Community style 1">
-        <div class="insta-overlay">
-          <span class="insta-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
-              <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
-              <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
-            </svg>
-          </span>
-        </div>
+        <img src="{{ resolve_image(tile.image_url) }}" alt="{{ tile.title or 'Community style' }}">
+        <div class="insta-overlay">{{ _icon }}</div>
       </div>
-      <div class="insta-item">
-        <img src="{{ url_for('static', filename='images/2.webp') }}" alt="Community style 2">
-        <div class="insta-overlay">
-          <span class="insta-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
-              <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
-              <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
-            </svg>
-          </span>
-        </div>
-      </div>
-      <div class="insta-item">
-        <img src="{{ url_for('static', filename='images/3.webp') }}" alt="Community style 3">
-        <div class="insta-overlay">
-          <span class="insta-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
-              <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
-              <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
-            </svg>
-          </span>
-        </div>
-      </div>
-      <div class="insta-item">
-        <img src="{{ url_for('static', filename='images/4.webp') }}" alt="Community style 4">
-        <div class="insta-overlay">
-          <span class="insta-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
-              <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
-              <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
-            </svg>
-          </span>
-        </div>
-      </div>
+      {% endif %}
+      {% endfor %}
     </div>
     <div style="text-align:center;"><a href="https://www.instagram.com/eyeconiceyewear01" target="_blank" class="btn-primary"
         style="display:inline-block;">View More on Instagram</a></div>
   </section>
+  {% endif %}
 
   {% include 'partials/_footer.html' %}
 
@@ -2694,11 +2483,13 @@
       cur = (n + slides.length) % slides.length;
       slides[cur].classList.add('active'); dots[cur].classList.add('active');
     }
-    function startAuto() { clearInterval(timer); timer = setInterval(() => goTo(cur + 1), 5500); }
-    dots.forEach(d => d.addEventListener('click', () => { goTo(+d.dataset.slide); startAuto(); }));
-    document.getElementById('hero-prev').addEventListener('click', () => { goTo(cur - 1); startAuto(); });
-    document.getElementById('hero-next').addEventListener('click', () => { goTo(cur + 1); startAuto(); });
-    startAuto();
+    function startAuto() { clearInterval(timer); if (slides.length > 1) timer = setInterval(() => goTo(cur + 1), 5500); }
+    if (slides.length) {
+      dots.forEach(d => d.addEventListener('click', () => { goTo(+d.dataset.slide); startAuto(); }));
+      document.getElementById('hero-prev').addEventListener('click', () => { goTo(cur - 1); startAuto(); });
+      document.getElementById('hero-next').addEventListener('click', () => { goTo(cur + 1); startAuto(); });
+      startAuto();
+    }
 
     // Mobile hero slider
     const mSlides = document.querySelectorAll('.mobile-hero-slide');
@@ -2709,8 +2500,10 @@
       mCur = (n + mSlides.length) % mSlides.length;
       mSlides[mCur].classList.add('active'); mDots[mCur].classList.add('active');
     }
-    mDots.forEach(d => d.addEventListener('click', () => mGoTo(+d.dataset.mslide)));
-    setInterval(() => mGoTo(mCur + 1), 4500);
+    if (mSlides.length) {
+      mDots.forEach(d => d.addEventListener('click', () => mGoTo(+d.dataset.mslide)));
+      if (mSlides.length > 1) setInterval(() => mGoTo(mCur + 1), 4500);
+    }
 
     // scrollGrid helper for section arrows (scrolls the nearest products-grid-2 or scroll row)
     function scrollGrid(btn, dir) {

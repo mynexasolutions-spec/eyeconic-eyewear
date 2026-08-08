@@ -1,10 +1,18 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, Response, jsonify
 import db
+from helpers import get_cached_store_settings
 from queries import (
     get_products, get_categories, get_brands,
     get_product_detail, get_related_products,
     get_homepage_products, get_trending_shapes, get_featured_categories,
+    get_home_sections, get_home_product_picks, get_products_by_ids,
+    ensure_builtin_home_sections, HOME_BUILTIN_CAROUSEL_DEFAULTS,
 )
+
+# Master, whole-section on/off switches (Admin > Home Page > toggle on each
+# card). Separate from the per-item is_active flags — this hides every item in
+# the section at once, e.g. taking down all product carousels in one click.
+HOME_SECTION_VISIBILITY_TYPES = ["hero", "category", "carousel", "banner", "stat", "testimonial", "instagram"]
 
 bp = Blueprint("public", __name__)
 
@@ -33,6 +41,123 @@ def index():
         men_products = women_products = kids_products = sun_products = blue_products = accessories_products = optical_products = []
         trending_shapes = featured_categories = []
         flash(f"Data loading error: {e}", "error")
+
+    try:
+        ensure_builtin_home_sections()
+    except Exception:
+        pass
+
+    try:
+        hero_slides       = get_home_sections("hero")
+        home_categories    = get_home_sections("category")
+        home_stats        = get_home_sections("stat")
+        home_banners      = get_home_sections("banner")
+        home_testimonials = get_home_sections("testimonial")
+        home_instagram    = get_home_sections("instagram")
+        home_carousel_defs = get_home_sections("carousel")
+        home_shape_defs   = get_home_sections("shape")
+    except Exception:
+        hero_slides = home_categories = home_stats = home_banners = home_testimonials = home_instagram = []
+        home_carousel_defs = []
+        home_shape_defs = []
+
+    # Master, whole-section switches (Admin > Home Page > the toggle on each
+    # card's header). Checked before the per-item content so a section that's
+    # turned off stays off even if it still has items/a fallback default.
+    try:
+        settings = get_cached_store_settings()
+    except Exception:
+        settings = {}
+    section_visible = {t: settings.get(f"home_visible_{t}", "true") != "false" for t in HOME_SECTION_VISIBILITY_TYPES}
+
+    # Guard against a blank hero if the table is empty (e.g. an admin deleted every slide)
+    if not section_visible["hero"]:
+        hero_slides = []
+    elif not hero_slides:
+        hero_slides = [{
+            "badge_text": "New Collection 2025", "title": "See The World", "subtitle": "Differently",
+            "body": "Premium eyewear crafted for those who refuse to blend in.",
+            "image_url": "https://images.unsplash.com/photo-1526045612212-70caf35c14df?w=1600&q=85&auto=format&fit=crop",
+            "cta_text": "Shop Now", "cta_link": url_for("public.shop"),
+            "cta2_text": "Explore Collection", "cta2_link": url_for("public.shop"),
+        }]
+
+    if not section_visible["category"]:
+        home_categories = []
+    elif not home_categories:
+        home_categories = [
+            {"title": "Men", "image_url": "man.webp", "cta_text": "Explore Now", "cta_link": url_for("public.shop", category="men")},
+            {"title": "Women", "image_url": "woman.webp", "cta_text": "Explore Now", "cta_link": url_for("public.shop", category="women")},
+            {"title": "Kids", "image_url": "kid.webp", "cta_text": "Explore Now", "cta_link": url_for("public.shop", category="kids")},
+        ]
+
+    if not section_visible["stat"]:
+        home_stats = []
+    if not section_visible["banner"]:
+        home_banners = []
+    if not section_visible["testimonial"]:
+        home_testimonials = []
+    if not section_visible["instagram"]:
+        home_instagram = []
+
+    # Section show/hide toggles. Shape, the 7 product carousels, and any custom
+    # carousel are each driven by their own home_sections row's is_active flag
+    # (Admin > Home Page), further gated by the "carousel" master switch above.
+    builtin_carousels = {} if not section_visible["carousel"] else {
+        c["id"]: c for c in home_carousel_defs if c["id"] in HOME_BUILTIN_CAROUSEL_DEFAULTS
+    }
+    home_shape = home_shape_defs[0] if home_shape_defs else None
+    home_visible = {
+        "shape": home_shape is not None,
+        "hero": section_visible["hero"], "category": section_visible["category"],
+        "instagram": section_visible["instagram"],
+    }
+    for key in HOME_BUILTIN_CAROUSEL_DEFAULTS:
+        home_visible[key] = key in builtin_carousels
+
+    # Manual product curation overrides (Admin > Home Page > Product Carousels)
+    try:
+        picked = get_home_product_picks("bestsellers")
+        if picked:
+            featured = get_products_by_ids(picked)
+        picked = get_home_product_picks("men")
+        if picked:
+            men_products = get_products_by_ids(picked)
+        picked = get_home_product_picks("women")
+        if picked:
+            women_products = get_products_by_ids(picked)
+        picked = get_home_product_picks("kids")
+        if picked:
+            kids_products = get_products_by_ids(picked)
+        picked = get_home_product_picks("accessories")
+        if picked:
+            accessories_products = get_products_by_ids(picked)
+        picked = get_home_product_picks("sunglasses")
+        if picked:
+            sun_products = get_products_by_ids(picked)
+        picked = get_home_product_picks("eyeglasses")
+        if picked:
+            optical_products = get_products_by_ids(picked)
+    except Exception:
+        pass
+
+    # Custom, admin-defined product carousels (e.g. "Premium Glasses"). The 7
+    # built-in ones are excluded here — they render in their own fixed section
+    # blocks above using builtin_carousels, not this generic loop. A carousel
+    # with no products picked yet is skipped — there's no automatic fallback for
+    # an arbitrary custom carousel the way there is for the built-in sections.
+    home_carousels = []
+    try:
+        if section_visible["carousel"]:
+            for c in home_carousel_defs:
+                if c["id"] in HOME_BUILTIN_CAROUSEL_DEFAULTS:
+                    continue
+                products = get_products_by_ids(get_home_product_picks(c["id"]))
+                if products:
+                    home_carousels.append({**c, "products": products})
+    except Exception:
+        home_carousels = []
+
     return render_template(
         "index.html",
         featured=featured, latest=latest, popular=popular,
@@ -42,13 +167,18 @@ def index():
         blue_products=blue_products, accessories_products=accessories_products,
         optical_products=optical_products,
         trending_shapes=trending_shapes,
+        home_categories=home_categories,
         featured_categories=featured_categories,
+        hero_slides=hero_slides, home_stats=home_stats, home_banners=home_banners,
+        home_testimonials=home_testimonials, home_instagram=home_instagram,
+        home_visible=home_visible, home_carousels=home_carousels,
+        builtin_carousels=builtin_carousels, home_shape=home_shape,
     )
 
 
 @bp.route("/shop")
 def shop():
-    search          = request.args.get("search", "").strip()
+    search          = request.args.get("search", request.args.get("q", "")).strip()
     selected_cats   = tuple(s for s in request.args.getlist("category") if s)
     selected_brands = tuple(s for s in request.args.getlist("brand")    if s)
     sort            = request.args.get("sort", "created_at_desc")

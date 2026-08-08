@@ -21,7 +21,7 @@
     <div style="padding:1.5rem; display:flex; flex-direction:column; gap:1.5rem;">
 
       <!-- COD Toggle -->
-      <div style="display:flex; justify-content:space-between; align-items:center; padding:1.25rem; background:var(--admin-bg); border-radius:0.75rem; border:1px solid var(--admin-border);">
+      <div class="admin-toggle-row" style="padding:1.25rem; background:var(--admin-bg); border-radius:0.75rem; border:1px solid var(--admin-border);">
         <div>
           <div style="font-weight:600; font-size:0.95rem; color:var(--admin-text);">Cash on Delivery (COD)</div>
           <div style="font-size:0.82rem; color:var(--admin-text-muted); margin-top:0.25rem;">Allow customers to pay when order is delivered</div>
@@ -36,7 +36,7 @@
       </div>
 
       <!-- Online Payment (Razorpay) Toggle -->
-      <div style="display:flex; justify-content:space-between; align-items:center; padding:1.25rem; background:var(--admin-bg); border-radius:0.75rem; border:1px solid var(--admin-border);">
+      <div class="admin-toggle-row" style="padding:1.25rem; background:var(--admin-bg); border-radius:0.75rem; border:1px solid var(--admin-border);">
         <div>
           <div style="font-weight:600; font-size:0.95rem; color:var(--admin-text);">Online Payment (UPI / Bank)</div>
           <div style="font-size:0.82rem; color:var(--admin-text-muted); margin-top:0.25rem;">Allow customers to pay online via Razorpay (UPI, Cards, NetBanking). Razorpay API keys must be configured below.</div>
@@ -61,7 +61,7 @@
     <div style="padding:1.5rem; display:flex; flex-direction:column; gap:1.5rem;">
 
       <!-- FREE ON ALL ORDERS toggle -->
-      <div style="display:flex; justify-content:space-between; align-items:center; padding:1.25rem; background:var(--admin-bg); border-radius:0.75rem; border:2px solid {% if settings.free_shipping_all == 'true' %}#22c55e{% else %}var(--admin-border){% endif %};" id="freeAllRow">
+      <div class="admin-toggle-row" style="padding:1.25rem; background:var(--admin-bg); border-radius:0.75rem; border:2px solid {% if settings.free_shipping_all == 'true' %}#22c55e{% else %}var(--admin-border){% endif %};" id="freeAllRow">
         <div>
           <div style="font-weight:700; font-size:0.95rem; color:var(--admin-text);">
             Free Shipping on <span style="color:#22c55e;">All Orders</span>
@@ -91,7 +91,7 @@
         </div>
 
         <!-- Free Shipping above threshold toggle -->
-        <div style="display:flex; justify-content:space-between; align-items:center; padding:1.25rem; background:var(--admin-bg); border-radius:0.75rem; border:1px solid var(--admin-border);">
+        <div class="admin-toggle-row" style="padding:1.25rem; background:var(--admin-bg); border-radius:0.75rem; border:1px solid var(--admin-border);">
           <div>
             <div style="font-weight:600; font-size:0.95rem; color:var(--admin-text);">Free Shipping Above a Minimum Order Value</div>
             <div style="font-size:0.82rem; color:var(--admin-text-muted); margin-top:0.25rem;">Waive the shipping fee when cart total reaches the threshold set below</div>
@@ -143,6 +143,71 @@
         </div>
       </div>
       <p style="font-size:0.8rem; color:var(--admin-text-muted);">Key ID and Secret can be found in your <strong>Razorpay Dashboard → Settings → API Keys</strong>. Use live keys for production and test keys for testing.</p>
+    </div>
+  </div>
+
+  <!-- iThink Logistics Settings -->
+  <div class="admin-card" style="margin-bottom:1.5rem;">
+    <div style="padding:1.25rem 1.5rem; border-bottom:1px solid var(--admin-border);">
+      <h2 style="font-size:1rem; font-weight:700; color:var(--admin-text);">iThink Logistics Integration</h2>
+      <p style="font-size:0.82rem; color:var(--admin-text-muted); margin-top:0.2rem;">Courier / shipment integration for order fulfillment (AWB generation, tracking, cancellation).</p>
+    </div>
+    <div style="padding:1.5rem; display:flex; flex-direction:column; gap:1.25rem;">
+      <div class="admin-grid-2" style="gap:1rem; max-width:800px;">
+        <div>
+          <label style="display:block; font-size:0.82rem; font-weight:600; color:var(--admin-text-muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.5rem;" for="ithink_access_token">Access Token</label>
+          <input type="text" id="ithink_access_token" name="ithink_access_token" value="{{ settings.ithink_access_token or '' }}"
+                 placeholder="Access token from iThink"
+                 style="width:100%; padding:0.75rem 1rem; border:1px solid var(--admin-border); border-radius:0.5rem; background:var(--admin-bg); color:var(--admin-text); font-size:0.9rem; outline:none; font-family:monospace; box-sizing:border-box;" />
+        </div>
+        <div>
+          <label style="display:block; font-size:0.82rem; font-weight:600; color:var(--admin-text-muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.5rem;" for="ithink_secret_key">Secret Key</label>
+          <input type="password" id="ithink_secret_key" name="ithink_secret_key" value="{{ settings.ithink_secret_key or '' }}"
+                 placeholder="••••••••••••••••"
+                 autocomplete="new-password"
+                 style="width:100%; padding:0.75rem 1rem; border:1px solid var(--admin-border); border-radius:0.5rem; background:var(--admin-bg); color:var(--admin-text); font-size:0.9rem; outline:none; box-sizing:border-box;" />
+        </div>
+      </div>
+      <div class="admin-grid-2" style="gap:1rem; max-width:800px;">
+        <div>
+          <label style="display:block; font-size:0.82rem; font-weight:600; color:var(--admin-text-muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.5rem;" for="ithink_pickup_address_id">Pickup Address ID</label>
+          <input type="text" id="ithink_pickup_address_id" name="ithink_pickup_address_id" value="{{ settings.ithink_pickup_address_id or '' }}"
+                 placeholder="e.g. 24"
+                 style="width:100%; padding:0.75rem 1rem; border:1px solid var(--admin-border); border-radius:0.5rem; background:var(--admin-bg); color:var(--admin-text); font-size:0.9rem; outline:none; font-family:monospace; box-sizing:border-box;" />
+        </div>
+        <div>
+          <label style="display:block; font-size:0.82rem; font-weight:600; color:var(--admin-text-muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.5rem;" for="ithink_return_address_id">Return / RTO Address ID</label>
+          <input type="text" id="ithink_return_address_id" name="ithink_return_address_id" value="{{ settings.ithink_return_address_id or '' }}"
+                 placeholder="Leave blank to reuse Pickup Address ID"
+                 style="width:100%; padding:0.75rem 1rem; border:1px solid var(--admin-border); border-radius:0.5rem; background:var(--admin-bg); color:var(--admin-text); font-size:0.9rem; outline:none; font-family:monospace; box-sizing:border-box;" />
+        </div>
+      </div>
+      <div class="admin-grid-2" style="gap:1rem; max-width:800px;">
+        <div>
+          <label style="display:block; font-size:0.82rem; font-weight:600; color:var(--admin-text-muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.5rem;" for="ithink_logistics_partner">Preferred Courier</label>
+          <select id="ithink_logistics_partner" name="ithink_logistics_partner" class="admin-input" style="background:var(--admin-bg);">
+            <option value="" {% if not settings.ithink_logistics_partner %}selected{% endif %}>Auto (let iThink choose)</option>
+            {% for val, label in [('delhivery','Delhivery'), ('bluedart','Bluedart'), ('xpressbees','Xpressbees'), ('ecom','Ecom Express'), ('ekart','Ekart')] %}
+            <option value="{{ val }}" {% if settings.ithink_logistics_partner == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label style="display:block; font-size:0.82rem; font-weight:600; color:var(--admin-text-muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.5rem;" for="ithink_default_weight_kg">Default Package Weight (kg)</label>
+          <input type="number" step="0.1" min="0.1" id="ithink_default_weight_kg" name="ithink_default_weight_kg" value="{{ settings.ithink_default_weight_kg or '0.5' }}"
+                 style="width:100%; padding:0.75rem 1rem; border:1px solid var(--admin-border); border-radius:0.5rem; background:var(--admin-bg); color:var(--admin-text); font-size:0.9rem; outline:none; box-sizing:border-box;" />
+        </div>
+      </div>
+      <div class="admin-grid-2" style="gap:1rem; max-width:800px;">
+        <div>
+          <label style="display:block; font-size:0.82rem; font-weight:600; color:var(--admin-text-muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.5rem;" for="ithink_service_type">Shipment Service Type</label>
+          <select id="ithink_service_type" name="ithink_service_type" class="admin-input" style="background:var(--admin-bg);">
+            <option value="surface" {% if not settings.ithink_service_type or settings.ithink_service_type == 'surface' %}selected{% endif %}>Surface (standard, cheaper)</option>
+            <option value="air" {% if settings.ithink_service_type == 'air' %}selected{% endif %}>Air (faster, costlier)</option>
+          </select>
+        </div>
+      </div>
+      <p style="font-size:0.8rem; color:var(--admin-text-muted);">Access Token, Secret Key and your Pickup/Return Address IDs are available in your <strong>iThink Logistics Dashboard</strong> (or from your iThink relationship manager). Once saved, open any order in <strong>Admin → Orders</strong> to generate its AWB / shipping label.</p>
     </div>
   </div>
 

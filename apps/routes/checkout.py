@@ -5,6 +5,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, sessio
 import db
 from helpers import get_cached_store_settings, refresh_cart_prices
 from extensions import csrf
+from shipping import track_shipment as ithink_track_shipment, tracking_url_for as ithink_tracking_url_for
 
 bp = Blueprint("checkout", __name__)
 
@@ -428,7 +429,15 @@ def order_detail(order_id):
         order = db.query_one("SELECT * FROM orders WHERE id=? AND user_id=?", [order_id, uid])
         if not order:
             abort(404)
-        items = db.query("SELECT * FROM order_items WHERE order_id=?", [order_id])
+        items = db.query(
+            """SELECT oi.*, p.name AS product_name, m.file_url AS image_url
+               FROM order_items oi
+               LEFT JOIN products p ON p.id = oi.product_id
+               LEFT JOIN product_images pi ON pi.product_id = oi.product_id AND pi.is_primary=1
+               LEFT JOIN media m ON m.id = pi.media_id
+               WHERE oi.order_id=?""",
+            [order_id],
+        )
         shipping_address = {}
         if order.get("shipping_address_json"):
             try:
@@ -439,7 +448,26 @@ def order_detail(order_id):
     except Exception as e:
         flash(f"Error fetching order: {e}", "error")
         return redirect(url_for("auth.account"))
-    return render_template("order_detail.html", order=order, items=items, shipping_address=shipping_address)
+
+    tracking = None
+    if order.get("awb_number"):
+        if not order.get("shipment_tracking_url"):
+            fallback_url = ithink_tracking_url_for(order["awb_number"])
+            try:
+                db.execute("UPDATE orders SET shipment_tracking_url=? WHERE id=?", [fallback_url, order_id])
+                order["shipment_tracking_url"] = fallback_url
+            except Exception:
+                pass
+        try:
+            ok, _msg, tracking = ithink_track_shipment(order["awb_number"])
+            if not ok:
+                tracking = None
+        except Exception:
+            tracking = None
+
+    return render_template(
+        "order_detail.html", order=order, items=items, shipping_address=shipping_address, tracking=tracking
+    )
 
 
 @bp.route("/order/<order_id>/cancel", methods=["POST"])

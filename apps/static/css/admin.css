@@ -184,12 +184,14 @@ body.admin-body {
   background: var(--admin-bg-surface);
   border: 1px solid var(--admin-border);
   border-radius: 0.75rem;
-  overflow: hidden;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
 
 .admin-table {
   width: 100%;
+  min-width: 640px;
   border-collapse: collapse;
 }
 
@@ -372,6 +374,20 @@ select.admin-input option {
   gap: 1.5rem;
 }
 
+/* Two-pane form layout (e.g. product form main/sidebar columns) */
+.admin-form-grid-main {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 2rem;
+  align-items: flex-start;
+}
+
+/* Paired-field form grid (e.g. two inputs side by side) */
+.admin-form-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
 /* PAGE HEADER — flex row that stacks on mobile */
 .admin-page-header {
   display: flex;
@@ -380,6 +396,34 @@ select.admin-input option {
   flex-wrap: wrap;
   gap: 1rem;
   margin-bottom: 2rem;
+}
+
+/* Toggle switch row (label + description on the left, switch on the right) */
+.admin-toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.admin-toggle-row > div:first-child {
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
+/* ── TABLET BREAKPOINT — collapse wide two-pane layouts before content gets squeezed ── */
+@media (max-width: 1100px) {
+  .admin-sidebar {
+    width: 220px;
+  }
+
+  .admin-grid-dash,
+  .admin-grid-dash-bottom,
+  .admin-grid-order,
+  .admin-form-grid-main {
+    grid-template-columns: 1fr !important;
+  }
 }
 
 /* ── MOBILE BREAKPOINT ── */
@@ -423,19 +467,15 @@ select.admin-input option {
     padding: 1rem;
   }
 
-  /* Tables scroll horizontally */
-  .admin-table-container {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
   /* All responsive grids collapse to single column */
   .admin-grid-2,
   .admin-grid-3,
   .admin-grid-stats,
   .admin-grid-dash,
   .admin-grid-dash-bottom,
-  .admin-grid-order {
+  .admin-grid-order,
+  .admin-form-grid-main,
+  .admin-form-grid-2 {
     grid-template-columns: 1fr !important;
   }
 
@@ -458,6 +498,18 @@ select.admin-input option {
   /* Flash messages padding */
   .admin-main > div[style*="padding:1.5rem 2rem"] {
     padding: 1rem !important;
+  }
+}
+
+/* ── SMALL PHONE BREAKPOINT ── */
+@media (max-width: 420px) {
+  /* Drop the "Welcome back," prefix, keep just the name, so it never crowds the avatar */
+  .admin-topbar-welcome-label {
+    display: none;
+  }
+
+  .admin-stat-card {
+    padding: 1rem;
   }
 }
 
