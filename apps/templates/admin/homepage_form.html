@@ -1,6 +1,6 @@
 {% extends "admin/base.html" %}
 {% set stype = item.section_type if item else section_type %}
-{% set type_labels = {'hero': 'Hero Slide', 'category': 'Category Tile', 'carousel': 'Product Carousel', 'banner': 'Lifestyle Banner', 'stat': 'Trust Stat', 'testimonial': 'Testimonial', 'instagram': 'Instagram Photo', 'shape': 'Shop by Shape Section'} %}
+{% set type_labels = {'hero': 'Hero Slide', 'category': 'Category Tile', 'carousel': 'Product Carousel', 'banner': 'Lifestyle Banner', 'stat': 'Trust Stat', 'testimonial': 'Testimonial', 'instagram': 'Instagram Photo', 'shape': 'Shop by Shape Section', 'policy': 'Trust Badge'} %}
 {% block title %}{{ 'Edit' if item else 'New' }} {{ type_labels[stype] }} – StoreAdmin{% endblock %}
 
 {% block content %}
@@ -103,6 +103,18 @@
     </div>
   </div>
   <p style="font-size:0.8rem; color:var(--admin-text-muted); margin-bottom:1.5rem;">The individual shape tiles (Round, Aviator, etc.) are managed in Admin &gt; Attributes &gt; Frame Shape, not here.</p>
+  {% endif %}
+
+  {% if stype == 'policy' %}
+  <div style="margin-bottom:1.5rem;">
+    <label class="admin-label">Badge Title *</label>
+    <input type="text" name="title" value="{{ item.title if item else '' }}" required placeholder="e.g. Free Shipping" class="admin-input" style="background:#fff;" />
+  </div>
+  <div style="margin-bottom:1.5rem;">
+    <label class="admin-label">Badge Subtitle *</label>
+    <input type="text" name="subtitle" value="{{ item.subtitle if item else '' }}" required placeholder="e.g. On orders above ₹599" class="admin-input" style="background:#fff;" />
+  </div>
+  <p style="font-size:0.8rem; color:var(--admin-text-muted); margin-bottom:1.5rem;">This badge's icon is fixed and can't be changed here — only its title and subtitle text.</p>
   {% endif %}
 
   {% if stype in ('hero', 'banner') %}

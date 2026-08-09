@@ -300,7 +300,8 @@ INSERT INTO store_settings (key, value) VALUES
     ('upi_id',''), ('bank_name',''), ('bank_account',''), ('bank_ifsc',''),
     ('razorpay_key_id',''), ('razorpay_key_secret',''),
     ('shipping_fee','99'), ('free_shipping_threshold','999'),
-    ('free_shipping_enabled','true'), ('free_shipping_all','false')
+    ('free_shipping_enabled','true'), ('free_shipping_all','false'),
+    ('social_instagram_url','https://www.instagram.com/eyeconiceyewear01')
 ON CONFLICT (key) DO NOTHING;
 """
 

@@ -211,6 +211,20 @@
     </div>
   </div>
 
+  <!-- Social Links -->
+  <div class="admin-card" style="margin-bottom:1.5rem;">
+    <div style="padding:1.25rem 1.5rem; border-bottom:1px solid var(--admin-border);">
+      <h2 style="font-size:1rem; font-weight:700; color:var(--admin-text);">Social Links</h2>
+      <p style="font-size:0.82rem; color:var(--admin-text-muted); margin-top:0.2rem;">Where the Instagram icon in the footer, and the "Follow Us" section on the home page, link to.</p>
+    </div>
+    <div style="padding:1.5rem;">
+      <label style="display:block; font-size:0.82rem; font-weight:600; color:var(--admin-text-muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.5rem;" for="social_instagram_url">Instagram URL</label>
+      <input type="text" id="social_instagram_url" name="social_instagram_url" value="{{ settings.social_instagram_url or '' }}"
+             placeholder="https://www.instagram.com/yourhandle"
+             style="width:100%; max-width:500px; padding:0.75rem 1rem; border:1px solid var(--admin-border); border-radius:0.5rem; background:var(--admin-bg); color:var(--admin-text); font-size:0.9rem; outline:none; box-sizing:border-box;" />
+    </div>
+  </div>
+
   <!-- Save Button -->
   <div style="display:flex; justify-content:flex-end;">
     <button type="submit" class="admin-btn admin-btn-primary" style="padding:0.875rem 2.5rem; font-size:1rem; font-weight:700;">

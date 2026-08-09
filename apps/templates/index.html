@@ -2360,34 +2360,21 @@
   {% endfor %}
 
   <!-- POLICY -->
+  {% if home_policy %}
+  {% set policy_icons = {
+    'policy_shipping': '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="1" y="3" width="15" height="13" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>',
+    'policy_returns':  '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 .49-3.99" /></svg>',
+    'policy_payment':  '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>'
+  } %}
   <div class="policy-strip">
+    {% for p in home_policy %}
     <div class="policy-item">
-      <div class="policy-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-          stroke-width="1.8">
-          <rect x="1" y="3" width="15" height="13" />
-          <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
-          <circle cx="5.5" cy="18.5" r="2.5" />
-          <circle cx="18.5" cy="18.5" r="2.5" />
-        </svg></div>
-      <div><strong>Free Shipping</strong><span>On orders above ₹599</span></div>
+      <div class="policy-icon">{{ (policy_icons[p.id] if p.id in policy_icons else policy_icons['policy_shipping']) | safe }}</div>
+      <div><strong>{{ p.title }}</strong><span>{{ p.subtitle }}</span></div>
     </div>
-    <div class="policy-item">
-      <div class="policy-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-          stroke-width="1.8">
-          <polyline points="1 4 1 10 7 10" />
-          <path d="M3.51 15a9 9 0 1 0 .49-3.99" />
-        </svg></div>
-      <div><strong>7 Days Return</strong><span>Easy return & exchange</span></div>
-    </div>
-    <div class="policy-item">
-      <div class="policy-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-          stroke-width="1.8">
-          <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
-          <line x1="1" y1="10" x2="23" y2="10" />
-        </svg></div>
-      <div><strong>Secure Payment</strong><span>100% secure checkout</span></div>
-    </div>
+    {% endfor %}
   </div>
+  {% endif %}
 
   <!-- LIFESTYLE BANNER -->
   {% if home_banners %}
@@ -2438,7 +2425,7 @@
   <!-- INSTAGRAM -->
   {% if home_visible.instagram %}
   <section class="insta-bg" style="padding-bottom:clamp(4rem,8vw,8rem);">
-    <p class="section-label">Follow Us @eyeconiceyewear01</p>
+    <p class="section-label">Follow Us @{{ instagram_handle }}</p>
     <h2 class="section-title">Be Part of the Community</h2>
     <div class="section-line"></div>
     <div class="insta-grid">
@@ -2466,7 +2453,7 @@
       {% endif %}
       {% endfor %}
     </div>
-    <div style="text-align:center;"><a href="https://www.instagram.com/eyeconiceyewear01" target="_blank" class="btn-primary"
+    <div style="text-align:center;"><a href="{{ instagram_url }}" target="_blank" rel="noopener" class="btn-primary"
         style="display:inline-block;">View More on Instagram</a></div>
   </section>
   {% endif %}

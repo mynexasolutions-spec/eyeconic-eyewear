@@ -1399,7 +1399,7 @@ def register(app):
 
     # ── Home Page Customization ───────────────────────────────────────────────
 
-    HOME_SECTION_TYPES = ["hero", "category", "carousel", "banner", "stat", "testimonial", "instagram"]
+    HOME_SECTION_TYPES = ["hero", "category", "carousel", "policy", "banner", "stat", "testimonial", "instagram"]
 
     @app.route("/admin/homepage")
     @require_admin
@@ -1413,6 +1413,8 @@ def register(app):
             row = db.query_one("SELECT COUNT(*) AS cnt FROM home_product_picks WHERE section_key=?", [c["id"]])
             c["product_count"] = row.get("cnt", 0) if row else 0
             c["is_builtin"] = c["id"] in HOME_BUILTIN_CAROUSEL_DEFAULTS
+        for p in sections["policy"]:
+            p["is_builtin"] = True
         return render_template(
             "admin/homepage.html", sections=sections, shape_section=shape_section,
             section_visible=section_visible,
@@ -1696,7 +1698,7 @@ def register(app):
                 "razorpay_key_id", "razorpay_key_secret",
                 "ithink_access_token", "ithink_secret_key", "ithink_pickup_address_id",
                 "ithink_return_address_id", "ithink_logistics_partner", "ithink_default_weight_kg",
-                "ithink_service_type",
+                "ithink_service_type", "social_instagram_url",
             ]
             numeric_keys = ["shipping_fee", "free_shipping_threshold"]
             try:

@@ -14,6 +14,7 @@
   'hero':        {'label': 'Hero Slides', 'desc': 'The rotating banner at the very top of the home page.', 'add': '+ Add Slide'},
   'category':    {'label': 'Shop by Category', 'desc': 'The Men / Women / Kids tiles ("Find Your Perfect Pair").', 'add': '+ Add Category Tile'},
   'carousel':    {'label': 'Product Carousels', 'desc': "Every product carousel on the home page lives here — Best Sellers, Men's, Women's, Kids', Premium Accessories, Sunglasses and Eyeglasses, plus any brand new ones you add. Rename them, reorder their products, hide them, or add a fresh one with any name (e.g. \"Premium Glasses\").", 'add': '+ Add Carousel'},
+  'policy':      {'label': 'Trust Badges', 'desc': 'The Free Shipping / 7 Days Return / Secure Payment strip after the product carousels. Edit the text, or hide the whole strip — these 3 are fixed to their icons, so no add/delete.', 'add': ''},
   'banner':      {'label': 'Lifestyle Banner', 'desc': 'The single full-width banner below the product carousels.', 'add': '+ Add Banner'},
   'stat':        {'label': 'Trust Stats', 'desc': 'The small stat strip (e.g. "50K+ Happy Customers").', 'add': '+ Add Stat'},
   'testimonial': {'label': 'Testimonials', 'desc': 'Customer review cards shown in the auto-scrolling marquee.', 'add': '+ Add Testimonial'},
@@ -41,7 +42,7 @@
           {{ 'Section Live' if section_visible[stype] else 'Section Hidden' }}
         </button>
       </form>
-      <a href="{{ url_for('admin_homepage_new', section_type=stype) }}" class="admin-btn btn-primary">{{ meta.add }}</a>
+      {% if meta.add %}<a href="{{ url_for('admin_homepage_new', section_type=stype) }}" class="admin-btn btn-primary">{{ meta.add }}</a>{% endif %}
     </div>
   </div>
 
@@ -49,7 +50,7 @@
     <table class="admin-table">
       <thead>
         <tr>
-          {% if stype not in ('stat', 'carousel') %}<th style="width:64px;">Image</th>{% endif %}
+          {% if stype not in ('stat', 'carousel', 'policy') %}<th style="width:64px;">Image</th>{% endif %}
           {% if stype == 'stat' %}
           <th>Value</th><th>Label</th>
           {% elif stype == 'testimonial' %}
@@ -69,7 +70,7 @@
       <tbody>
         {% for it in items %}
         <tr>
-          {% if stype not in ('stat', 'carousel') %}
+          {% if stype not in ('stat', 'carousel', 'policy') %}
           <td>
             <div style="width:44px; height:44px; border-radius:8px; overflow:hidden; border:1px solid var(--admin-border); background:#f8fafc;">
               <img src="{{ resolve_image(it.image_url) }}" alt="" style="width:100%; height:100%; object-fit:cover;" onerror="this.style.visibility='hidden'">
@@ -142,7 +143,7 @@
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="{{ 5 if stype in ('stat', 'carousel') else 6 }}" style="text-align:center; padding:2rem; color:var(--admin-text-muted);">Nothing here yet. {{ meta.add }} to get started.</td></tr>
+        <tr><td colspan="{{ 5 if stype in ('stat', 'carousel', 'policy') else 6 }}" style="text-align:center; padding:2rem; color:var(--admin-text-muted);">Nothing here yet.{% if meta.add %} {{ meta.add }} to get started.{% endif %}</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -186,7 +187,7 @@
   {% endif %}
 </div>
 
-{% for stype in ['carousel', 'banner', 'stat', 'testimonial', 'instagram'] %}
+{% for stype in ['carousel', 'policy', 'banner', 'stat', 'testimonial', 'instagram'] %}
 {{ section_card(stype) }}
 {% endfor %}
 {% endblock %}

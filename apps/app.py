@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from extensions import csrf, limiter, handle_csrf_error
-from helpers import register_jinja
+from helpers import register_jinja, get_cached_store_settings
 import db
 
 compress = Compress()
@@ -72,7 +72,16 @@ def create_app():
     def inject_globals():
         cart  = session.get("cart", {})
         count = sum(item.get("qty", 0) for item in cart.values())
-        return {"cart_count": count, "current_user": session.get("user")}
+        try:
+            settings = get_cached_store_settings()
+        except Exception:
+            settings = {}
+        instagram_url = settings.get("social_instagram_url") or "https://www.instagram.com/eyeconiceyewear01"
+        instagram_handle = instagram_url.rstrip("/").rsplit("/", 1)[-1] or "eyeconiceyewear01"
+        return {
+            "cart_count": count, "current_user": session.get("user"),
+            "instagram_url": instagram_url, "instagram_handle": instagram_handle,
+        }
 
     # Blueprints
     from routes.public   import bp as public_bp

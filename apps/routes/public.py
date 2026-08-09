@@ -12,7 +12,7 @@ from queries import (
 # Master, whole-section on/off switches (Admin > Home Page > toggle on each
 # card). Separate from the per-item is_active flags — this hides every item in
 # the section at once, e.g. taking down all product carousels in one click.
-HOME_SECTION_VISIBILITY_TYPES = ["hero", "category", "carousel", "banner", "stat", "testimonial", "instagram"]
+HOME_SECTION_VISIBILITY_TYPES = ["hero", "category", "carousel", "policy", "banner", "stat", "testimonial", "instagram"]
 
 bp = Blueprint("public", __name__)
 
@@ -56,10 +56,12 @@ def index():
         home_instagram    = get_home_sections("instagram")
         home_carousel_defs = get_home_sections("carousel")
         home_shape_defs   = get_home_sections("shape")
+        home_policy       = get_home_sections("policy")
     except Exception:
         hero_slides = home_categories = home_stats = home_banners = home_testimonials = home_instagram = []
         home_carousel_defs = []
         home_shape_defs = []
+        home_policy = []
 
     # Master, whole-section switches (Admin > Home Page > the toggle on each
     # card's header). Checked before the per-item content so a section that's
@@ -93,6 +95,8 @@ def index():
 
     if not section_visible["stat"]:
         home_stats = []
+    if not section_visible["policy"]:
+        home_policy = []
     if not section_visible["banner"]:
         home_banners = []
     if not section_visible["testimonial"]:
@@ -172,7 +176,7 @@ def index():
         hero_slides=hero_slides, home_stats=home_stats, home_banners=home_banners,
         home_testimonials=home_testimonials, home_instagram=home_instagram,
         home_visible=home_visible, home_carousels=home_carousels,
-        builtin_carousels=builtin_carousels, home_shape=home_shape,
+        builtin_carousels=builtin_carousels, home_shape=home_shape, home_policy=home_policy,
     )
 
 

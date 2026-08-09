@@ -235,6 +235,15 @@ HOME_SHAPE_SECTION_DEFAULTS = {
     "cta_text": "Explore Collection", "cta_link": "/shop",
 }
 
+# The 3-icon trust-badge strip after the product carousels (Free Shipping /
+# 7 Days Return / Secure Payment). Each icon is fixed to its row's id (not its
+# position), so hiding the middle one doesn't shuffle icons onto the wrong text.
+HOME_POLICY_DEFAULTS = {
+    "policy_shipping": {"title": "Free Shipping", "subtitle": "On orders above ₹599", "sort_order": 0},
+    "policy_returns":  {"title": "7 Days Return", "subtitle": "Easy return & exchange", "sort_order": 1},
+    "policy_payment":  {"title": "Secure Payment", "subtitle": "100% secure checkout", "sort_order": 2},
+}
+
 
 def ensure_builtin_home_sections():
     """Idempotent, self-healing seed. The 7 carousels are gated behind a
@@ -270,6 +279,16 @@ def ensure_builtin_home_sections():
                (id, section_type, title, badge_text, cta_text, cta_link, sort_order, is_active)
                VALUES (?,?,?,?,?,?,?,?)""",
             ["shape", "shape", d["title"], d["badge_text"], d["cta_text"], d["cta_link"], 0, is_active]
+        )
+        changed = True
+
+    for key, d in HOME_POLICY_DEFAULTS.items():
+        if db.query_one("SELECT id FROM home_sections WHERE id=?", [key]):
+            continue
+        db.execute(
+            """INSERT INTO home_sections (id, section_type, title, subtitle, sort_order, is_active)
+               VALUES (?,?,?,?,?,1)""",
+            [key, "policy", d["title"], d["subtitle"], d["sort_order"]]
         )
         changed = True
 
