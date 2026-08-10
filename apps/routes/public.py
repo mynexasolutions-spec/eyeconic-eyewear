@@ -5,7 +5,8 @@ from queries import (
     get_products, get_categories, get_brands,
     get_product_detail, get_related_products,
     get_homepage_products, get_trending_shapes, get_featured_categories,
-    get_home_sections, get_home_product_picks, get_products_by_ids,
+    get_home_sections, get_home_sections_all,
+    get_home_product_picks, get_home_product_picks_all, get_products_by_ids,
     ensure_builtin_home_sections, HOME_BUILTIN_CAROUSEL_DEFAULTS,
     get_lens_types_with_options,
 )
@@ -49,15 +50,16 @@ def index():
         pass
 
     try:
-        hero_slides       = get_home_sections("hero")
-        home_categories    = get_home_sections("category")
-        home_stats        = get_home_sections("stat")
-        home_banners      = get_home_sections("banner")
-        home_testimonials = get_home_sections("testimonial")
-        home_instagram    = get_home_sections("instagram")
-        home_carousel_defs = get_home_sections("carousel")
-        home_shape_defs   = get_home_sections("shape")
-        home_policy       = get_home_sections("policy")
+        sections           = get_home_sections_all()
+        hero_slides        = sections.get("hero", [])
+        home_categories    = sections.get("category", [])
+        home_stats         = sections.get("stat", [])
+        home_banners       = sections.get("banner", [])
+        home_testimonials  = sections.get("testimonial", [])
+        home_instagram     = sections.get("instagram", [])
+        home_carousel_defs = sections.get("carousel", [])
+        home_shape_defs    = sections.get("shape", [])
+        home_policy        = sections.get("policy", [])
     except Exception:
         hero_slides = home_categories = home_stats = home_banners = home_testimonials = home_instagram = []
         home_carousel_defs = []
@@ -122,25 +124,30 @@ def index():
 
     # Manual product curation overrides (Admin > Home Page > Product Carousels)
     try:
-        picked = get_home_product_picks("bestsellers")
+        all_picks = get_home_product_picks_all()
+    except Exception:
+        all_picks = {}
+
+    try:
+        picked = all_picks.get("bestsellers")
         if picked:
             featured = get_products_by_ids(picked)
-        picked = get_home_product_picks("men")
+        picked = all_picks.get("men")
         if picked:
             men_products = get_products_by_ids(picked)
-        picked = get_home_product_picks("women")
+        picked = all_picks.get("women")
         if picked:
             women_products = get_products_by_ids(picked)
-        picked = get_home_product_picks("kids")
+        picked = all_picks.get("kids")
         if picked:
             kids_products = get_products_by_ids(picked)
-        picked = get_home_product_picks("accessories")
+        picked = all_picks.get("accessories")
         if picked:
             accessories_products = get_products_by_ids(picked)
-        picked = get_home_product_picks("sunglasses")
+        picked = all_picks.get("sunglasses")
         if picked:
             sun_products = get_products_by_ids(picked)
-        picked = get_home_product_picks("eyeglasses")
+        picked = all_picks.get("eyeglasses")
         if picked:
             optical_products = get_products_by_ids(picked)
     except Exception:
@@ -157,7 +164,7 @@ def index():
             for c in home_carousel_defs:
                 if c["id"] in HOME_BUILTIN_CAROUSEL_DEFAULTS:
                     continue
-                products = get_products_by_ids(get_home_product_picks(c["id"]))
+                products = get_products_by_ids(all_picks.get(c["id"], []))
                 if products:
                     home_carousels.append({**c, "products": products})
     except Exception:

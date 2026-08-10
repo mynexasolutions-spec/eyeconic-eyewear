@@ -134,7 +134,7 @@
       background: #fff;
       width: 240px;
       border-color: var(--gold);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
     }
 
     .search-box svg {
@@ -1543,11 +1543,13 @@
       flex-direction: column;
       padding: 5rem 2rem 2rem;
       transition: right 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-      box-shadow: -10px 0 40px rgba(0,0,0,0.1);
+      box-shadow: -10px 0 40px rgba(0, 0, 0, 0.1);
     }
+
     .mobile-nav.open {
       right: 0;
     }
+
     .mobile-nav a {
       font-family: var(--font-display);
       font-size: 1.5rem;
@@ -1557,9 +1559,11 @@
       padding: 1rem 0;
       border-bottom: 1px solid var(--light-gray);
     }
+
     .mobile-nav a:last-child {
       border-bottom: none;
     }
+
     .mobile-nav a:hover {
       color: var(--gold);
     }
@@ -1567,13 +1571,14 @@
     .mobile-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.4);
+      background: rgba(0, 0, 0, 0.4);
       backdrop-filter: blur(4px);
       z-index: 1999;
       opacity: 0;
       pointer-events: none;
       transition: opacity 0.4s ease;
     }
+
     .mobile-overlay.open {
       opacity: 1;
       pointer-events: auto;
@@ -1635,12 +1640,15 @@
         gap: 2.5rem;
         text-align: center;
       }
+
       .footer-tagline {
         margin: 0 auto 1.2rem;
       }
+
       .footer-social {
         justify-content: center;
       }
+
       .newsletter-form {
         max-width: 400px;
         margin: 0 auto;
@@ -1775,9 +1783,11 @@
       justify-content: center;
       text-decoration: none;
     }
+
     .btn-atc:hover:not(:disabled) {
       background: var(--gold);
     }
+
     .btn-atc:disabled {
       background: var(--light-gray);
       color: var(--mid-gray);
@@ -1797,10 +1807,36 @@
 <body>
 
   <style>
-    .flash-container { position:fixed; top:80px; right:1rem; z-index:9999; display:flex; flex-direction:column; gap:0.5rem; max-width:360px; }
-    .flash-msg { padding:0.9rem 1.25rem; border-radius:4px; display:flex; justify-content:space-between; align-items:center; gap:1rem; background:#fff; box-shadow:0 4px 20px rgba(0,0,0,0.12); border-left:3px solid var(--gold); }
-    .flash-msg.error   { border-left-color: #ef4444; }
-    .flash-msg.success { border-left-color: #22c55e; }
+    .flash-container {
+      position: fixed;
+      top: 80px;
+      right: 1rem;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      max-width: 360px;
+    }
+
+    .flash-msg {
+      padding: 0.9rem 1.25rem;
+      border-radius: 4px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      background: #fff;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+      border-left: 3px solid var(--gold);
+    }
+
+    .flash-msg.error {
+      border-left-color: #ef4444;
+    }
+
+    .flash-msg.success {
+      border-left-color: #22c55e;
+    }
   </style>
 
   {% with messages = get_flashed_messages(with_categories=true) %}

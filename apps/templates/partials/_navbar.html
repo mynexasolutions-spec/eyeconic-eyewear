@@ -674,44 +674,9 @@
   // tags, so window/document-level events (not just link clicks) are what
   // reliably catch every "user tapped something that leaves this page" case.
   (function () {
-    var bar = document.createElement('div');
-    bar.id = 'nav-progress-bar';
-    bar.style.cssText = 'position:fixed;top:0;left:0;height:3px;width:0%;' +
-      'background:var(--gold,#C9A455);z-index:99999;pointer-events:none;' +
-      'transition:width .3s ease,opacity .3s ease;box-shadow:0 0 8px rgba(201,164,85,.6);opacity:0;';
-    document.addEventListener('DOMContentLoaded', function () {
-      document.body.appendChild(bar);
-    });
-
-    var started = false;
-    var progressTimer = null;
-    function startProgress() {
-      if (started || !bar.parentNode) return;
-      started = true;
-      bar.style.opacity = '1';
-      bar.style.width = '25%';
-      var pct = 25;
-      progressTimer = setInterval(function () {
-        pct += (90 - pct) * 0.1;
-        bar.style.width = pct + '%';
-      }, 200);
-    }
-    window.addEventListener('pagehide', function () { clearInterval(progressTimer); });
-    window.addEventListener('beforeunload', startProgress);
-
-    document.addEventListener('click', function (e) {
-      var a = e.target.closest && e.target.closest('a[href]');
-      if (!a) return;
-      var href = a.getAttribute('href') || '';
-      if (a.target === '_blank' || a.hasAttribute('download')) return;
-      if (/^(#|javascript:|mailto:|tel:)/.test(href)) return;
-      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-      startProgress();
-    });
     document.addEventListener('submit', function (e) {
       var form = e.target;
       if (!(form instanceof HTMLFormElement) || e.defaultPrevented) return;
-      startProgress();
 
       // Disable + spin the submit button while the request is in flight —
       // stops double-submits (e.g. double-click "Place Order") and shows

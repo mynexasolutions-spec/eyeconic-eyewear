@@ -6,7 +6,7 @@ from functools import wraps
 from flask import render_template, request, redirect, url_for, flash, abort, session
 import db
 from helpers import slugify, get_cached_store_settings, get_unique_slug, handle_upload, handle_uploads_parallel
-from queries import get_products, get_categories, get_brands, get_admin_stats, get_featured_categories, get_trending_shapes, PRODUCTS_SELECT, get_product_detail, get_homepage_products, get_home_sections, get_home_sections_admin, get_home_section, get_home_product_picks, get_home_product_picks_admin, ensure_builtin_home_sections, HOME_BUILTIN_CAROUSEL_DEFAULTS
+from queries import get_products, get_categories, get_brands, get_admin_stats, get_featured_categories, get_trending_shapes, PRODUCTS_SELECT, get_product_detail, get_homepage_products, get_home_sections, get_home_sections_all, get_home_sections_admin, get_home_section, get_home_product_picks, get_home_product_picks_all, get_home_product_picks_admin, ensure_builtin_home_sections, HOME_BUILTIN_CAROUSEL_DEFAULTS
 import shipping
 
 
@@ -1469,6 +1469,7 @@ def register(app):
                      1 if f.get("is_active") == "on" else 0]
                 )
                 get_home_sections.cache_clear()
+                get_home_sections_all.cache_clear()
                 flash("Homepage item created.", "success")
                 return redirect(url_for("admin_homepage"))
             except Exception as e:
@@ -1495,6 +1496,7 @@ def register(app):
                      int(f.get("rating") or 5), 1 if f.get("is_active") == "on" else 0, item_id]
                 )
                 get_home_sections.cache_clear()
+                get_home_sections_all.cache_clear()
                 flash("Homepage item updated.", "success")
                 return redirect(url_for("admin_homepage"))
             except Exception as e:
@@ -1509,7 +1511,9 @@ def register(app):
                 tx.execute("DELETE FROM home_sections WHERE id=?", [item_id])
                 tx.execute("DELETE FROM home_product_picks WHERE section_key=?", [item_id])
             get_home_sections.cache_clear()
+            get_home_sections_all.cache_clear()
             get_home_product_picks.cache_clear()
+            get_home_product_picks_all.cache_clear()
             flash("Homepage item deleted.", "success")
         except Exception as e:
             flash(f"Error: {e}", "error")
@@ -1524,6 +1528,7 @@ def register(app):
                 [item_id]
             )
             get_home_sections.cache_clear()
+            get_home_sections_all.cache_clear()
         except Exception as e:
             flash(f"Error: {e}", "error")
         return redirect(url_for("admin_homepage"))
@@ -1552,6 +1557,7 @@ def register(app):
                     tx.execute("UPDATE home_sections SET sort_order=? WHERE id=?", [neighbor["sort_order"], item["id"]])
                     tx.execute("UPDATE home_sections SET sort_order=? WHERE id=?", [item["sort_order"], neighbor["id"]])
                 get_home_sections.cache_clear()
+                get_home_sections_all.cache_clear()
         except Exception as e:
             flash(f"Error: {e}", "error")
         return redirect(url_for("admin_homepage"))
@@ -1628,6 +1634,7 @@ def register(app):
                         [str(uuid.uuid4()), section_key, product_id, next_order]
                     )
                     get_home_product_picks.cache_clear()
+                    get_home_product_picks_all.cache_clear()
                     flash("Product added.", "success")
         except Exception as e:
             flash(f"Error: {e}", "error")
@@ -1642,6 +1649,7 @@ def register(app):
         try:
             db.execute("DELETE FROM home_product_picks WHERE id=?", [pick_id])
             get_home_product_picks.cache_clear()
+            get_home_product_picks_all.cache_clear()
             flash("Product removed.", "success")
         except Exception as e:
             flash(f"Error: {e}", "error")
@@ -1671,6 +1679,7 @@ def register(app):
                     tx.execute("UPDATE home_product_picks SET sort_order=? WHERE id=?", [neighbor["sort_order"], pick["id"]])
                     tx.execute("UPDATE home_product_picks SET sort_order=? WHERE id=?", [pick["sort_order"], neighbor["id"]])
                 get_home_product_picks.cache_clear()
+                get_home_product_picks_all.cache_clear()
         except Exception as e:
             flash(f"Error: {e}", "error")
         return redirect(url_for("admin_homepage_products", section_key=pick["section_key"]))
@@ -1684,6 +1693,7 @@ def register(app):
         try:
             db.execute("DELETE FROM home_product_picks WHERE section_key=?", [section_key])
             get_home_product_picks.cache_clear()
+            get_home_product_picks_all.cache_clear()
             flash("Products cleared.", "success")
         except Exception as e:
             flash(f"Error: {e}", "error")

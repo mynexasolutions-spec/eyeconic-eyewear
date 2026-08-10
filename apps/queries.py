@@ -206,6 +206,23 @@ def get_home_sections(section_type):
     ) or []
 
 
+@ttl_cache(ttl_seconds=120)
+def get_home_sections_all():
+    """All active homepage content blocks, grouped by section_type — one round
+    trip instead of the ~9 separate get_home_sections() calls the home page
+    used to make (hero/category/stat/banner/testimonial/instagram/carousel/
+    shape/policy), which was a big chunk of homepage load time given the
+    DB's network latency from the app server."""
+    rows = db.query(
+        "SELECT * FROM home_sections WHERE is_active=1 "
+        "ORDER BY section_type ASC, sort_order ASC, created_at ASC"
+    ) or []
+    grouped = {}
+    for r in rows:
+        grouped.setdefault(r["section_type"], []).append(r)
+    return grouped
+
+
 # The 7 product carousels that used to be hardcoded, fixed home page sections.
 # They're seeded as real home_sections rows (id = their section key) so admins
 # manage them from the same Product Carousels table as any custom carousel —
@@ -246,12 +263,18 @@ HOME_POLICY_DEFAULTS = {
 }
 
 
+@ttl_cache(ttl_seconds=300)
 def ensure_builtin_home_sections():
     """Idempotent, self-healing seed. The 7 carousels are gated behind a
     store_settings flag (cheap: skip 7 lookups once seeded); the shape row is
     checked unconditionally on its own — a single indexed lookup — so seeding
     something new later (like this one was) can't get silently skipped by an
-    already-true flag from before it existed."""
+    already-true flag from before it existed.
+
+    Called on every home page load, so it's itself ttl-cached — otherwise its
+    4 unconditional existence checks (shape + 3 policy rows) would run as real
+    DB round trips on every single request forever, even though they almost
+    always find nothing to do."""
     settings = get_cached_store_settings()
     changed = False
 
@@ -295,6 +318,7 @@ def ensure_builtin_home_sections():
 
     if changed:
         get_home_sections.cache_clear()
+        get_home_sections_all.cache_clear()
         get_cached_store_settings.cache_clear()
 
 
@@ -319,6 +343,21 @@ def get_home_product_picks(section_key):
         [section_key]
     )
     return [r["product_id"] for r in rows] if rows else []
+
+
+@ttl_cache(ttl_seconds=120)
+def get_home_product_picks_all():
+    """All curated homepage product picks, grouped by section_key — one round
+    trip instead of the 7+ separate get_home_product_picks() calls (one per
+    built-in carousel, plus one per custom carousel) the home page used to
+    make."""
+    rows = db.query(
+        "SELECT section_key, product_id FROM home_product_picks ORDER BY section_key ASC, sort_order ASC"
+    ) or []
+    grouped = {}
+    for r in rows:
+        grouped.setdefault(r["section_key"], []).append(r["product_id"])
+    return grouped
 
 
 def get_home_product_picks_admin(section_key):
