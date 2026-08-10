@@ -20,7 +20,7 @@ def _build_pool() -> ThreadedConnectionPool:
     url = urlparse(DATABASE_URL)
     return ThreadedConnectionPool(
         minconn=1,
-        maxconn=10,
+        maxconn=20,
         host=unquote(url.hostname or ""),
         port=url.port or 5432,
         dbname=url.path.lstrip("/"),

@@ -441,20 +441,30 @@ def _fetch_product_attributes(product_id):
 def get_product_detail(product_id):
     product = db.query_one(f"{PRODUCTS_SELECT} WHERE p.id = ?", [product_id])
     if not product:
-        return None, [], [], [], []
+        return None, [], [], [], [], [], []
 
-    # These 4 only depend on product_id, not on each other — run them on
-    # separate pooled connections concurrently instead of one after another.
-    # This is the dominant cost of the page: 4 sequential round trips become 1.
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
+    category_slug = product.get("category_slug", "")
+    is_lens       = product.get("is_lens_compatible")
+
+    # These all only depend on product_id (or fields already known from the
+    # product row above), not on each other — run them on separate pooled
+    # connections concurrently instead of one after another. This — plus the
+    # route no longer making separate sequential calls for related products
+    # and lens options after this function returns — is the dominant cost of
+    # the page: what used to be ~5 sequential round trips collapses to ~2.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as ex:
         f_images     = ex.submit(_fetch_product_images, product_id)
         f_variations = ex.submit(_fetch_product_variations, product_id)
         f_reviews    = ex.submit(_fetch_product_reviews, product_id)
         f_attributes = ex.submit(_fetch_product_attributes, product_id)
+        f_related    = ex.submit(get_related_products, category_slug, product_id)
+        f_lens       = ex.submit(get_lens_types_with_options) if is_lens else None
         images     = f_images.result()
         variations = f_variations.result()
         reviews    = f_reviews.result()
         attributes = f_attributes.result()
+        related    = f_related.result()
+        lens_types = f_lens.result() if f_lens else []
 
     base_price = float(product.get("sale_price") or product.get("price") or 0)
     base_stock = int(product.get("stock_quantity") or 0)
@@ -545,33 +555,43 @@ def get_product_detail(product_id):
             values = [{"id": str(r["id"]), "value": r["value"]} for r in fallback]
         attr["values"] = values
 
-    return product, images, variations, reviews, attributes
+    return product, images, variations, reviews, attributes, related, lens_types
 
 
 @ttl_cache(ttl_seconds=300)
 def get_lens_types_with_options():
     """Active lens types with their options, for the lens-selection widget on
     lens-compatible product pages. Global (not per-product) and rarely changes,
-    so it's cached — previously this was 2 uncached queries per lens type
-    (1 + N) run fresh on every single product-detail page load."""
-    lens_types = db.query(
-        "SELECT * FROM lens_types WHERE is_active = 1 ORDER BY display_order ASC, name ASC"
-    )
-    if not lens_types:
-        return []
-    type_ids = [t["id"] for t in lens_types]
-    placeholders = ",".join(["?"] * len(type_ids))
-    all_options = db.query(
-        f"SELECT * FROM lens_options WHERE lens_type_id IN ({placeholders}) AND is_active = 1 "
-        f"ORDER BY display_order ASC, name ASC",
-        type_ids,
-    )
-    options_by_type = {}
-    for o in all_options:
-        options_by_type.setdefault(str(o["lens_type_id"]), []).append(o)
-    for t in lens_types:
-        t["options"] = options_by_type.get(str(t["id"]), [])
-    return lens_types
+    so it's cached. A single LEFT JOIN instead of a type query + a follow-up
+    options query — the second query used to depend on the first query's IDs,
+    so it couldn't run until the first came back; now it's 1 round trip."""
+    rows = db.query("""
+        SELECT
+            lt.id AS lt_id, lt.name AS lt_name, lt.description AS lt_description,
+            lt.image_url AS lt_image_url, lt.display_order AS lt_display_order,
+            lo.id AS lo_id, lo.name AS lo_name, lo.price_modifier AS lo_price_modifier,
+            lo.description AS lo_description, lo.display_order AS lo_display_order
+        FROM lens_types lt
+        LEFT JOIN lens_options lo ON lo.lens_type_id = lt.id AND lo.is_active = 1
+        WHERE lt.is_active = 1
+        ORDER BY lt.display_order ASC, lt.name ASC, lo.display_order ASC, lo.name ASC
+    """)
+    lens_types = {}
+    for r in rows:
+        tid = str(r["lt_id"])
+        if tid not in lens_types:
+            lens_types[tid] = {
+                "id": r["lt_id"], "name": r["lt_name"], "description": r["lt_description"],
+                "image_url": r["lt_image_url"], "display_order": r["lt_display_order"],
+                "options": [],
+            }
+        if r["lo_id"] is not None:
+            lens_types[tid]["options"].append({
+                "id": r["lo_id"], "name": r["lo_name"],
+                "price_modifier": r["lo_price_modifier"],
+                "description": r["lo_description"], "display_order": r["lo_display_order"],
+            })
+    return list(lens_types.values())
 
 
 @ttl_cache(ttl_seconds=120)

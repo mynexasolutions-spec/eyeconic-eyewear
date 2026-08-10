@@ -1,14 +1,13 @@
+import concurrent.futures
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, Response, jsonify
 import db
 from helpers import get_cached_store_settings
 from queries import (
     get_products, get_categories, get_brands,
-    get_product_detail, get_related_products,
+    get_product_detail,
     get_homepage_products, get_trending_shapes, get_featured_categories,
-    get_home_sections, get_home_sections_all,
-    get_home_product_picks, get_home_product_picks_all, get_products_by_ids,
+    get_home_sections_all, get_home_product_picks_all, get_products_by_ids,
     ensure_builtin_home_sections, HOME_BUILTIN_CAROUSEL_DEFAULTS,
-    get_lens_types_with_options,
 )
 
 # Master, whole-section on/off switches (Admin > Home Page > toggle on each
@@ -22,57 +21,81 @@ bp = Blueprint("public", __name__)
 @bp.route("/")
 def index():
     try:
-        data = get_homepage_products()
-        featured            = data["featured"]
-        latest              = data["latest"]
-        popular             = data["popular"]
-        promo1              = data["promo1"]
-        promo2              = data["promo2"]
-        men_products        = data["men"]
-        women_products      = data["women"]
-        kids_products       = data["kids"]
-        sun_products        = data["sunglasses"]
-        blue_products       = data["blue_light"]
-        accessories_products = data.get("accessories", [])
-        optical_products    = data["optical"]
-        
-        trending_shapes     = get_trending_shapes()
-        featured_categories = get_featured_categories()
-    except Exception as e:
-        featured = latest = popular = promo1 = promo2 = []
-        men_products = women_products = kids_products = sun_products = blue_products = accessories_products = optical_products = []
-        trending_shapes = featured_categories = []
-        flash(f"Data loading error: {e}", "error")
-
-    try:
         ensure_builtin_home_sections()
     except Exception:
         pass
 
-    try:
-        sections           = get_home_sections_all()
-        hero_slides        = sections.get("hero", [])
-        home_categories    = sections.get("category", [])
-        home_stats         = sections.get("stat", [])
-        home_banners       = sections.get("banner", [])
-        home_testimonials  = sections.get("testimonial", [])
-        home_instagram     = sections.get("instagram", [])
-        home_carousel_defs = sections.get("carousel", [])
-        home_shape_defs    = sections.get("shape", [])
-        home_policy        = sections.get("policy", [])
-    except Exception:
-        hero_slides = home_categories = home_stats = home_banners = home_testimonials = home_instagram = []
-        home_carousel_defs = []
-        home_shape_defs = []
-        home_policy = []
+    # These 6 reads are independent of each other — fire them on separate
+    # pooled connections concurrently instead of one after another (same
+    # pattern as get_product_detail() in queries.py). Was the dominant cost
+    # of the home page: ~6 sequential DB round trips collapse into ~1.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as ex:
+        f_products   = ex.submit(get_homepage_products)
+        f_shapes     = ex.submit(get_trending_shapes)
+        f_categories = ex.submit(get_featured_categories)
+        f_sections   = ex.submit(get_home_sections_all)
+        f_settings   = ex.submit(get_cached_store_settings)
+        f_picks      = ex.submit(get_home_product_picks_all)
+
+        try:
+            data = f_products.result()
+            featured              = data["featured"]
+            latest                = data["latest"]
+            popular               = data["popular"]
+            promo1                = data["promo1"]
+            promo2                = data["promo2"]
+            men_products          = data["men"]
+            women_products        = data["women"]
+            kids_products         = data["kids"]
+            sun_products          = data["sunglasses"]
+            blue_products         = data["blue_light"]
+            accessories_products  = data.get("accessories", [])
+            optical_products      = data["optical"]
+        except Exception as e:
+            featured = latest = popular = promo1 = promo2 = []
+            men_products = women_products = kids_products = sun_products = blue_products = accessories_products = optical_products = []
+            flash(f"Data loading error: {e}", "error")
+
+        try:
+            trending_shapes = f_shapes.result()
+        except Exception:
+            trending_shapes = []
+
+        try:
+            featured_categories = f_categories.result()
+        except Exception:
+            featured_categories = []
+
+        try:
+            sections           = f_sections.result()
+            hero_slides        = sections.get("hero", [])
+            home_categories    = sections.get("category", [])
+            home_stats         = sections.get("stat", [])
+            home_banners       = sections.get("banner", [])
+            home_testimonials  = sections.get("testimonial", [])
+            home_instagram     = sections.get("instagram", [])
+            home_carousel_defs = sections.get("carousel", [])
+            home_shape_defs    = sections.get("shape", [])
+            home_policy        = sections.get("policy", [])
+        except Exception:
+            hero_slides = home_categories = home_stats = home_banners = home_testimonials = home_instagram = []
+            home_carousel_defs = []
+            home_shape_defs = []
+            home_policy = []
+
+        try:
+            settings = f_settings.result()
+        except Exception:
+            settings = {}
+
+        try:
+            all_picks = f_picks.result()
+        except Exception:
+            all_picks = {}
 
     # Master, whole-section switches (Admin > Home Page > the toggle on each
     # card's header). Checked before the per-item content so a section that's
     # turned off stays off even if it still has items/a fallback default.
-    try:
-        settings = get_cached_store_settings()
-    except Exception:
-        settings = {}
     section_visible = {t: settings.get(f"home_visible_{t}", "true") != "false" for t in HOME_SECTION_VISIBILITY_TYPES}
 
     # Guard against a blank hero if the table is empty (e.g. an admin deleted every slide)
@@ -123,11 +146,7 @@ def index():
         home_visible[key] = key in builtin_carousels
 
     # Manual product curation overrides (Admin > Home Page > Product Carousels)
-    try:
-        all_picks = get_home_product_picks_all()
-    except Exception:
-        all_picks = {}
-
+    # all_picks was already fetched in the parallel block above.
     try:
         picked = all_picks.get("bestsellers")
         if picked:
@@ -208,19 +227,28 @@ def shop():
         max_price_val = float(max_price) if max_price else None
     except ValueError:
         min_price_val = max_price_val = None
-    try:
-        products, total, total_pages = get_products(
+    # Independent reads — fire concurrently instead of one after another
+    # (same pattern as index()/get_product_detail()).
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
+        f_products = ex.submit(
+            get_products,
             search=search, categories=selected_cats, brands=selected_brands,
             shape=shape, sort=sort, page=page, per_page=18, on_sale=on_sale,
             featured=featured, min_price=min_price_val, max_price=max_price_val,
         )
-        all_categories = get_categories()
-        all_brands     = get_brands()
-        trending_shapes = get_trending_shapes()
-    except Exception as e:
-        products, total, total_pages = [], 0, 1
-        all_categories = all_brands = trending_shapes = []
-        flash(f"Database error: {e}", "error")
+        f_categories = ex.submit(get_categories)
+        f_brands     = ex.submit(get_brands)
+        f_shapes     = ex.submit(get_trending_shapes)
+
+        try:
+            products, total, total_pages = f_products.result()
+            all_categories = f_categories.result()
+            all_brands     = f_brands.result()
+            trending_shapes = f_shapes.result()
+        except Exception as e:
+            products, total, total_pages = [], 0, 1
+            all_categories = all_brands = trending_shapes = []
+            flash(f"Database error: {e}", "error")
 
     # Build parent → children tree for the sidebar accordion
     parent_cats  = [c for c in all_categories if not c.get("parent_id")]
@@ -249,24 +277,17 @@ def shop():
 @bp.route("/product/<product_id>")
 def product_detail(product_id):
     try:
-        product, images, variations, reviews, attributes = get_product_detail(product_id)
+        # related products + lens options are now fetched inside
+        # get_product_detail(), concurrently with everything else, instead
+        # of as separate sequential calls after it returns.
+        product, images, variations, reviews, attributes, related, lens_types = get_product_detail(product_id)
     except Exception as e:
         flash(f"Error loading product: {e}", "error")
         return redirect(url_for("public.shop"))
     if not product:
         abort(404)
-    try:
-        related = get_related_products(product.get("category_slug", ""), product_id)
-    except Exception:
-        related = []
-        
-    lens_types = []
-    if product.get("is_lens_compatible"):
-        try:
-            lens_types = get_lens_types_with_options()
-        except Exception as e:
-            print(f"Error loading lenses: {e}")
-            
+
+
     return render_template(
         "product.html",
         product=product, images=images, variations=variations,
