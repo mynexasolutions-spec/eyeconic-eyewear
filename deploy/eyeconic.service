@@ -1,0 +1,34 @@
+# systemd unit — keeps the app running always-on (auto-restarts on crash or
+# reboot), which is the whole point of moving off serverless. Copy to
+# /etc/systemd/system/eyeconic.service on the EC2 instance.
+#
+# Adjust the paths below (WorkingDirectory, EnvironmentFile, ExecStart) if you
+# clone the repo somewhere other than /home/ubuntu/eyeconic-eyewear-main, and
+# adjust --workers to (2 x number_of_vCPUs) + 1 for your instance size — run
+# `nproc` on the box to check.
+
+[Unit]
+Description=EyeConic Eyewear (Gunicorn)
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/eyeconic-eyewear-main/apps
+EnvironmentFile=/home/ubuntu/eyeconic-eyewear-main/apps/.env
+ExecStart=/home/ubuntu/eyeconic-eyewear-main/venv/bin/gunicorn \
+    --workers 3 \
+    --bind 127.0.0.1:8000 \
+    --timeout 60 \
+    --access-logfile /home/ubuntu/eyeconic-eyewear-main/logs/access.log \
+    --error-logfile /home/ubuntu/eyeconic-eyewear-main/logs/error.log \
+    wsgi:app
+Restart=always
+RestartSec=3
+
+# Don't let one wedged request pile up connections forever
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

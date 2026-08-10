@@ -5,7 +5,7 @@ import itertools
 from functools import wraps
 from flask import render_template, request, redirect, url_for, flash, abort, session
 import db
-from helpers import slugify, get_cached_store_settings, get_unique_slug, handle_upload
+from helpers import slugify, get_cached_store_settings, get_unique_slug, handle_upload, handle_uploads_parallel
 from queries import get_products, get_categories, get_brands, get_admin_stats, get_featured_categories, get_trending_shapes, PRODUCTS_SELECT, get_product_detail, get_homepage_products, get_home_sections, get_home_sections_admin, get_home_section, get_home_product_picks, get_home_product_picks_admin, ensure_builtin_home_sections, HOME_BUILTIN_CAROUSEL_DEFAULTS
 import shipping
 
@@ -223,12 +223,13 @@ def register(app):
                 sku_input = f.get("sku", "").strip()
                 sku = sku_input or generate_unique_product_sku(name)
 
-                # Uploads happen outside the transaction (they're network calls to Cloudinary)
-                primary_file = request.files.get("primary_image")
-                primary_url = handle_upload(primary_file) if primary_file and primary_file.filename else None
-
+                # Uploads happen outside the transaction (they're network calls to
+                # Cloudinary) and all run concurrently instead of one-at-a-time.
+                primary_file  = request.files.get("primary_image")
                 gallery_files = request.files.getlist("gallery_images")
-                gallery_urls  = [handle_upload(gfile) for gfile in gallery_files if gfile and gfile.filename]
+                uploaded      = handle_uploads_parallel([primary_file] + list(gallery_files))
+                primary_url   = uploaded[0]
+                gallery_urls  = [u for u in uploaded[1:] if u]
 
                 attr_ids     = request.form.getlist("attribute_ids")
                 val_ids      = request.form.getlist("attribute_value_ids")
@@ -317,12 +318,13 @@ def register(app):
                 sku_input = (f.get("sku") or "").strip()
                 updated_sku = sku_input or product.get("sku") or generate_unique_product_sku(name)
 
-                # Uploads happen outside the transaction (they're network calls to Cloudinary)
-                primary_file = request.files.get("primary_image")
-                primary_url = handle_upload(primary_file) if primary_file and primary_file.filename else None
-
+                # Uploads happen outside the transaction (they're network calls to
+                # Cloudinary) and all run concurrently instead of one-at-a-time.
+                primary_file  = request.files.get("primary_image")
                 gallery_files = request.files.getlist("gallery_images")
-                gallery_urls  = [handle_upload(gfile) for gfile in gallery_files if gfile and gfile.filename]
+                uploaded      = handle_uploads_parallel([primary_file] + list(gallery_files))
+                primary_url   = uploaded[0]
+                gallery_urls  = [u for u in uploaded[1:] if u]
 
                 attr_ids = request.form.getlist("attribute_ids")
                 val_ids  = request.form.getlist("attribute_value_ids")

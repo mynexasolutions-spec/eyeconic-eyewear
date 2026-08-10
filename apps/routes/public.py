@@ -7,6 +7,7 @@ from queries import (
     get_homepage_products, get_trending_shapes, get_featured_categories,
     get_home_sections, get_home_product_picks, get_products_by_ids,
     ensure_builtin_home_sections, HOME_BUILTIN_CAROUSEL_DEFAULTS,
+    get_lens_types_with_options,
 )
 
 # Master, whole-section on/off switches (Admin > Home Page > toggle on each
@@ -255,12 +256,7 @@ def product_detail(product_id):
     lens_types = []
     if product.get("is_lens_compatible"):
         try:
-            lens_types = db.query("SELECT * FROM lens_types WHERE is_active = 1 ORDER BY display_order ASC, name ASC")
-            for t in lens_types:
-                t["options"] = db.query(
-                    "SELECT * FROM lens_options WHERE lens_type_id = ? AND is_active = 1 ORDER BY display_order ASC, name ASC",
-                    [t["id"]]
-                )
+            lens_types = get_lens_types_with_options()
         except Exception as e:
             print(f"Error loading lenses: {e}")
             

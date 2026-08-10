@@ -109,10 +109,9 @@ app = create_app()
 
 
 def _ensure_home_sections_table():
-    """Create + seed the home_sections table. Runs unconditionally on every process
-    boot (not gated behind WERKZEUG_RUN_MAIN) so it always executes in whichever
-    process ends up serving requests — including under the dev reloader and
-    serverless cold starts."""
+    """Create + seed the home_sections table. Called once by _run_startup_bootstrap()
+    below — never directly on every request/cold start (see that function's
+    docstring for why that used to be a major perf problem)."""
     try:
         db.execute("""
             CREATE TABLE IF NOT EXISTS home_sections (
@@ -264,7 +263,7 @@ def _ensure_home_product_picks_table():
 
 def _ensure_shipping_columns():
     """Add iThink Logistics shipment columns to orders if they're missing.
-    Runs unconditionally on every boot, same as the home page tables above."""
+    Called once by _run_startup_bootstrap() below."""
     try:
         for col in ("awb_number", "shipment_courier", "shipment_tracking_url"):
             db.execute(f"ALTER TABLE orders ADD COLUMN IF NOT EXISTS {col} TEXT DEFAULT ''")
@@ -272,33 +271,78 @@ def _ensure_shipping_columns():
         print(f"[db.migrate] Error setting up shipping columns: {_e}")
 
 
-_ensure_home_sections_table()
-_ensure_home_product_picks_table()
-_ensure_shipping_columns()
+def _ensure_perf_indexes():
+    """A few FK-lookup indexes used by the product detail page that were
+    missing from the original schema. CREATE INDEX IF NOT EXISTS is cheap and
+    safe to run alongside the other one-time setup below."""
+    statements = [
+        "CREATE INDEX IF NOT EXISTS idx_product_reviews_product ON product_reviews(product_id, is_approved)",
+        "CREATE INDEX IF NOT EXISTS idx_product_attributes_product ON product_attributes(product_id)",
+        "CREATE INDEX IF NOT EXISTS idx_product_attribute_values_product ON product_attribute_values(product_id)",
+        "CREATE INDEX IF NOT EXISTS idx_attribute_values_attribute ON attribute_values(attribute_id)",
+        "CREATE INDEX IF NOT EXISTS idx_variation_attribute_values_avid ON variation_attribute_values(attribute_value_id)",
+    ]
+    for sql in statements:
+        try:
+            db.execute(sql)
+        except Exception as _e:
+            print(f"[db.migrate] Error creating index ({sql}): {_e}")
 
-import os as _os
-if _os.environ.get("WERKZEUG_RUN_MAIN") != "true":
+
+def _run_startup_bootstrap():
+    """One-time schema setup + default-data seeding.
+
+    This used to run unconditionally on every process start — including every
+    serverless cold start — costing ~15 sequential DB round trips (2 CREATE
+    TABLE, 2 CREATE INDEX, 6 COUNT checks, 3 ALTER TABLE, 1 more COUNT) before
+    a single request could be served. On a low-traffic Vercel deployment,
+    cold starts are frequent, so that tax was being paid constantly and was
+    the single biggest contributor to "the site feels slow."
+
+    Now it's gated behind one fast lookup: once the schema/seed work has run
+    successfully, a marker row is written to store_settings, and every
+    subsequent boot (cold or warm) just does that one SELECT and returns.
+    """
+    try:
+        row = db.query_one("SELECT value FROM store_settings WHERE key='_bootstrap_done'")
+        if row and row.get("value") == "true":
+            return
+    except Exception:
+        pass  # store_settings itself may not exist yet on a brand-new database
+
+    _ensure_home_sections_table()
+    _ensure_home_product_picks_table()
+    _ensure_shipping_columns()
+    _ensure_perf_indexes()
+
     try:
         db.migrate()
-        # Seed default store settings if table is empty
-        try:
-            count_res = db.query_one("SELECT COUNT(*) as count FROM store_settings")
-            if count_res and count_res.get("count") == 0:
-                defaults = [
-                    ("cod_enabled", "true"),
-                    ("online_payment_enabled", "false"),
-                    ("free_shipping_enabled", "true"),
-                    ("free_shipping_all", "false"),
-                    ("shipping_fee", "49"),
-                    ("free_shipping_threshold", "599"),
-                ]
-                for key, val in defaults:
-                    db.execute("INSERT INTO store_settings (key, value) VALUES (?, ?)", [key, val])
-                print("[db.migrate] Seeded default store settings.")
-        except Exception as _e:
-            print(f"[db.migrate] Error seeding settings: {_e}")
+        count_res = db.query_one("SELECT COUNT(*) as count FROM store_settings")
+        if count_res and count_res.get("count") == 0:
+            defaults = [
+                ("cod_enabled", "true"),
+                ("online_payment_enabled", "false"),
+                ("free_shipping_enabled", "true"),
+                ("free_shipping_all", "false"),
+                ("shipping_fee", "49"),
+                ("free_shipping_threshold", "599"),
+            ]
+            for key, val in defaults:
+                db.execute("INSERT INTO store_settings (key, value) VALUES (?, ?)", [key, val])
+            print("[db.migrate] Seeded default store settings.")
     except Exception as _e:
         print(f"[db.migrate] {_e}")
+
+    try:
+        db.execute(
+            "INSERT INTO store_settings (key, value) VALUES ('_bootstrap_done','true') "
+            "ON CONFLICT (key) DO UPDATE SET value='true'"
+        )
+    except Exception as _e:
+        print(f"[db.migrate] Error setting bootstrap marker: {_e}")
+
+
+_run_startup_bootstrap()
 
 if __name__ == "__main__":
     port  = int(os.getenv("PORT", 5001))

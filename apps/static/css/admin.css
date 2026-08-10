@@ -22,6 +22,15 @@ body.admin-body {
   font-family: 'Inter', sans-serif;
   margin: 0;
   padding: 0;
+  overflow-x: hidden;
+}
+
+/* Chart.js canvases size themselves via JS and can briefly report a width
+   wider than their container before the resize observer settles — this is
+   a hard ceiling so a chart can never be the thing that forces the whole
+   admin page to scroll horizontally on a phone. */
+body.admin-body canvas {
+  max-width: 100%;
 }
 
 .admin-layout {
@@ -139,6 +148,11 @@ body.admin-body {
   border-radius: 0.75rem;
   padding: 1.5rem;
   box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  /* Grid/flex items default to min-width:auto, which lets wide content
+     (a table with min-width:640px, a Chart.js canvas) push the item past
+     its track and force the whole page to scroll horizontally. This is
+     what was cutting text off at the left edge on phones. */
+  min-width: 0;
 }
 
 .admin-stat-card {
@@ -216,6 +230,25 @@ body.admin-body {
 
 .admin-table tbody tr:hover {
   background: #f8fafc;
+}
+
+/* SUBMIT SPINNER — injected by JS into a submit button while its form's
+   request is in flight, so a slow save/delete can't be double-clicked and
+   the admin can see something is actually happening. */
+.btn-spinner-inline {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 0.5rem;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  vertical-align: -2px;
+  opacity: 0.85;
+  animation: admin-btn-spin 0.6s linear infinite;
+}
+@keyframes admin-btn-spin {
+  to { transform: rotate(360deg); }
 }
 
 /* BUTTONS */
@@ -354,18 +387,21 @@ select.admin-input option {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1.25rem;
+  min-width: 0;
 }
 
 .admin-grid-dash {
   display: grid;
   grid-template-columns: 1.5fr 1fr;
   gap: 1.5rem;
+  min-width: 0;
 }
 
 .admin-grid-dash-bottom {
   display: grid;
   grid-template-columns: 2fr 1.2fr;
   gap: 1.5rem;
+  min-width: 0;
 }
 
 .admin-grid-order {

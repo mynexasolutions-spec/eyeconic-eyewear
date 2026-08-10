@@ -1,5 +1,6 @@
 import math
 import datetime as _dt
+import concurrent.futures
 import db
 from helpers import ttl_cache, get_cached_store_settings
 
@@ -351,13 +352,8 @@ def get_products_by_ids(product_ids):
     return [by_id[pid] for pid in product_ids if pid in by_id]
 
 
-@ttl_cache(ttl_seconds=120)
-def get_product_detail(product_id):
-    product = db.query_one(f"{PRODUCTS_SELECT} WHERE p.id = ?", [product_id])
-    if not product:
-        return None, [], [], [], []
-
-    images = db.query(
+def _fetch_product_images(product_id):
+    return db.query(
         """SELECT m.file_url AS image_url, pi.is_primary,
                   COALESCE(m.alt_text, '') AS alt_text
            FROM product_images pi
@@ -367,15 +363,71 @@ def get_product_detail(product_id):
         [product_id],
     )
 
-    variations = db.query(
-        "SELECT * FROM product_variations WHERE product_id = ?", [product_id]
+
+def _fetch_product_variations(product_id):
+    return db.query("SELECT * FROM product_variations WHERE product_id = ?", [product_id])
+
+
+def _fetch_product_reviews(product_id):
+    return db.query(
+        """SELECT r.*, r.body AS comment, (u.first_name || ' ' || u.last_name) AS reviewer_name
+           FROM product_reviews r LEFT JOIN users u ON u.id = r.user_id
+           WHERE r.product_id = ? AND r.is_approved = 1
+           ORDER BY r.created_at DESC""",
+        [product_id],
     )
+
+
+def _fetch_product_attributes(product_id):
+    attributes = db.query("""
+        SELECT a.id, a.name, a.slug
+        FROM attributes a
+        JOIN product_attributes pa ON pa.attribute_id = a.id
+        WHERE pa.product_id = ?
+        ORDER BY pa.display_order ASC
+    """, [product_id])
+    if not attributes:
+        attributes = db.query("""
+            SELECT DISTINCT a.id, a.name, a.slug
+            FROM attributes a
+            JOIN attribute_values av ON av.attribute_id = a.id
+            JOIN variation_attribute_values vav ON vav.attribute_value_id = av.id
+            JOIN product_variations pv ON pv.id = vav.variation_id
+            WHERE pv.product_id = ?
+        """, [product_id])
+    return attributes
+
+
+@ttl_cache(ttl_seconds=120)
+def get_product_detail(product_id):
+    product = db.query_one(f"{PRODUCTS_SELECT} WHERE p.id = ?", [product_id])
+    if not product:
+        return None, [], [], [], []
+
+    # These 4 only depend on product_id, not on each other — run them on
+    # separate pooled connections concurrently instead of one after another.
+    # This is the dominant cost of the page: 4 sequential round trips become 1.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
+        f_images     = ex.submit(_fetch_product_images, product_id)
+        f_variations = ex.submit(_fetch_product_variations, product_id)
+        f_reviews    = ex.submit(_fetch_product_reviews, product_id)
+        f_attributes = ex.submit(_fetch_product_attributes, product_id)
+        images     = f_images.result()
+        variations = f_variations.result()
+        reviews    = f_reviews.result()
+        attributes = f_attributes.result()
 
     base_price = float(product.get("sale_price") or product.get("price") or 0)
     base_stock = int(product.get("stock_quantity") or 0)
 
-    # Batch-load all variation→attribute_value mappings in ONE query
-    if variations:
+    if product.get("type") == "variable":
+        product["price"] = base_price if base_price > 0 else float(product.get("price") or 0)
+
+    # The two batch lookups below each depend on one of the results above
+    # (variation ids / attribute ids) but not on each other — also parallel.
+    def _vav_map():
+        if not variations:
+            return {}
         var_ids      = [v["id"] for v in variations]
         placeholders = ",".join(["?"] * len(var_ids))
         all_vav      = db.query(
@@ -386,50 +438,11 @@ def get_product_detail(product_id):
         vav_map = {}
         for row in all_vav:
             vav_map.setdefault(str(row["variation_id"]), []).append(row["attribute_value_id"])
-        for v in variations:
-            v["price"]               = base_price
-            v["stock_quantity"]      = base_stock
-            v["attribute_value_ids"] = vav_map.get(str(v["id"]), [])
-    else:
-        for v in variations:
-            v["price"]               = base_price
-            v["stock_quantity"]      = base_stock
-            v["attribute_value_ids"] = []
+        return vav_map
 
-    if product.get("type") == "variable":
-        product["price"] = base_price if base_price > 0 else float(product.get("price") or 0)
-
-    reviews = db.query(
-        """SELECT r.*, r.body AS comment, (u.first_name || ' ' || u.last_name) AS reviewer_name
-           FROM product_reviews r LEFT JOIN users u ON u.id = r.user_id
-           WHERE r.product_id = ? AND r.is_approved = 1
-           ORDER BY r.created_at DESC""",
-        [product_id],
-    )
-
-    attributes = db.query("""
-        SELECT a.id, a.name, a.slug
-        FROM attributes a
-        JOIN product_attributes pa ON pa.attribute_id = a.id
-        WHERE pa.product_id = ?
-        ORDER BY pa.display_order ASC
-    """, [product_id])
-
-    if not attributes:
-        attributes = db.query("""
-            SELECT DISTINCT a.id, a.name, a.slug
-            FROM attributes a
-            JOIN attribute_values av ON av.attribute_id = a.id
-            JOIN variation_attribute_values vav ON vav.attribute_value_id = av.id
-            JOIN product_variations pv ON pv.id = vav.variation_id
-            WHERE pv.product_id = ?
-        """, [product_id])
-
-    # Batch-load attribute values with correct priority:
-    # 1. Admin-selected values for this product (product_attribute_values)
-    # 2. Values linked via generated variations (variation_attribute_values)
-    # 3. All values for the attribute (last resort — should rarely be reached)
-    if attributes:
+    def _attribute_value_maps():
+        if not attributes:
+            return {}, {}
         attr_ids     = [a["id"] for a in attributes]
         placeholders = ",".join(["?"] * len(attr_ids))
 
@@ -463,21 +476,63 @@ def get_product_detail(product_id):
             var_map.setdefault(str(row["attribute_id"]), []).append(
                 {"id": str(row["id"]), "value": row["value"]}
             )
+        return pav_map, var_map
 
-        for attr in attributes:
-            aid    = str(attr["id"])
-            values = pav_map.get(aid) or var_map.get(aid)
-            if not values:
-                # Priority 3: load all values for this attribute (fallback)
-                fallback = db.query(
-                    "SELECT id, value FROM attribute_values "
-                    "WHERE attribute_id = ? ORDER BY value ASC",
-                    [attr["id"]],
-                )
-                values = [{"id": str(r["id"]), "value": r["value"]} for r in fallback]
-            attr["values"] = values
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
+        f_vav = ex.submit(_vav_map)
+        f_attr_maps = ex.submit(_attribute_value_maps)
+        vav_map = f_vav.result()
+        pav_map, var_map = f_attr_maps.result()
+
+    for v in variations:
+        v["price"]               = base_price
+        v["stock_quantity"]      = base_stock
+        v["attribute_value_ids"] = vav_map.get(str(v["id"]), [])
+
+    # Batch-load attribute values with correct priority:
+    # 1. Admin-selected values for this product (product_attribute_values)
+    # 2. Values linked via generated variations (variation_attribute_values)
+    # 3. All values for the attribute (last resort — should rarely be reached)
+    for attr in attributes:
+        aid    = str(attr["id"])
+        values = pav_map.get(aid) or var_map.get(aid)
+        if not values:
+            # Priority 3: load all values for this attribute (fallback)
+            fallback = db.query(
+                "SELECT id, value FROM attribute_values "
+                "WHERE attribute_id = ? ORDER BY value ASC",
+                [attr["id"]],
+            )
+            values = [{"id": str(r["id"]), "value": r["value"]} for r in fallback]
+        attr["values"] = values
 
     return product, images, variations, reviews, attributes
+
+
+@ttl_cache(ttl_seconds=300)
+def get_lens_types_with_options():
+    """Active lens types with their options, for the lens-selection widget on
+    lens-compatible product pages. Global (not per-product) and rarely changes,
+    so it's cached — previously this was 2 uncached queries per lens type
+    (1 + N) run fresh on every single product-detail page load."""
+    lens_types = db.query(
+        "SELECT * FROM lens_types WHERE is_active = 1 ORDER BY display_order ASC, name ASC"
+    )
+    if not lens_types:
+        return []
+    type_ids = [t["id"] for t in lens_types]
+    placeholders = ",".join(["?"] * len(type_ids))
+    all_options = db.query(
+        f"SELECT * FROM lens_options WHERE lens_type_id IN ({placeholders}) AND is_active = 1 "
+        f"ORDER BY display_order ASC, name ASC",
+        type_ids,
+    )
+    options_by_type = {}
+    for o in all_options:
+        options_by_type.setdefault(str(o["lens_type_id"]), []).append(o)
+    for t in lens_types:
+        t["options"] = options_by_type.get(str(t["id"]), [])
+    return lens_types
 
 
 @ttl_cache(ttl_seconds=120)

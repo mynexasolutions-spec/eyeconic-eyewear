@@ -438,6 +438,25 @@
       margin-left: 0;
     }
   }
+
+  /* Injected by JS into a submit button while its form's request is in
+     flight (checkout, add-to-cart-style forms, newsletter, etc.) so a slow
+     request can't be double-clicked and the customer sees it's working. */
+  .btn-spinner-inline {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    margin-right: 0.5rem;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    vertical-align: -2px;
+    opacity: 0.85;
+    animation: btn-spin-nav 0.6s linear infinite;
+  }
+  @keyframes btn-spin-nav {
+    to { transform: rotate(360deg); }
+  }
 </style>
 
 <!-- NAV HTML -->
@@ -649,4 +668,102 @@
       if (closeBtn) closeBtn.addEventListener('click', closeNav);
     }
   });
+
+  // ---- Perceived-speed: instant nav feedback + hover/touch prefetch ----
+  // Product cards navigate via onclick="window.location.href=...", not <a>
+  // tags, so window/document-level events (not just link clicks) are what
+  // reliably catch every "user tapped something that leaves this page" case.
+  (function () {
+    var bar = document.createElement('div');
+    bar.id = 'nav-progress-bar';
+    bar.style.cssText = 'position:fixed;top:0;left:0;height:3px;width:0%;' +
+      'background:var(--gold,#C9A455);z-index:99999;pointer-events:none;' +
+      'transition:width .3s ease,opacity .3s ease;box-shadow:0 0 8px rgba(201,164,85,.6);opacity:0;';
+    document.addEventListener('DOMContentLoaded', function () {
+      document.body.appendChild(bar);
+    });
+
+    var started = false;
+    var progressTimer = null;
+    function startProgress() {
+      if (started || !bar.parentNode) return;
+      started = true;
+      bar.style.opacity = '1';
+      bar.style.width = '25%';
+      var pct = 25;
+      progressTimer = setInterval(function () {
+        pct += (90 - pct) * 0.1;
+        bar.style.width = pct + '%';
+      }, 200);
+    }
+    window.addEventListener('pagehide', function () { clearInterval(progressTimer); });
+    window.addEventListener('beforeunload', startProgress);
+
+    document.addEventListener('click', function (e) {
+      var a = e.target.closest && e.target.closest('a[href]');
+      if (!a) return;
+      var href = a.getAttribute('href') || '';
+      if (a.target === '_blank' || a.hasAttribute('download')) return;
+      if (/^(#|javascript:|mailto:|tel:)/.test(href)) return;
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      startProgress();
+    });
+    document.addEventListener('submit', function (e) {
+      var form = e.target;
+      if (!(form instanceof HTMLFormElement) || e.defaultPrevented) return;
+      startProgress();
+
+      // Disable + spin the submit button while the request is in flight —
+      // stops double-submits (e.g. double-click "Place Order") and shows
+      // something is actually happening on slower connections. Skipped if
+      // the form's own onsubmit cancelled it (e.g. a confirm() dialog the
+      // user said no to) — the e.defaultPrevented check above already
+      // covers that since we return before reaching here in that case.
+      var btn = e.submitter || form.querySelector('button[type="submit"]:not([disabled])');
+      if (!btn || btn.disabled || btn.hasAttribute('data-no-spin')) return;
+      btn.disabled = true;
+      btn.style.opacity = '0.7';
+      btn.style.cursor = 'not-allowed';
+      btn.style.pointerEvents = 'none';
+      if (btn.tagName === 'BUTTON') {
+        var spinner = document.createElement('span');
+        spinner.className = 'btn-spinner-inline';
+        btn.insertBefore(spinner, btn.firstChild);
+      }
+    });
+
+    // Hover/touch prefetch: by the time a click on a product or shop link
+    // actually lands, the page is often already sitting in the browser cache.
+    var conn = navigator.connection;
+    if (!conn || !conn.saveData) {
+      var prefetched = {};
+      var prefetchLink = function (href) {
+        if (!href || prefetched[href]) return;
+        if (href.indexOf('/product/') !== 0 && href.indexOf('/shop') !== 0) return;
+        prefetched[href] = true;
+        var link = document.createElement('link');
+        link.rel = 'prefetch';
+        link.href = href;
+        document.head.appendChild(link);
+      };
+      var onHoverTarget = function (e) {
+        var a = e.target.closest && e.target.closest('a[href]');
+        if (a) prefetchLink(a.getAttribute('href'));
+      };
+      document.addEventListener('mouseover', onHoverTarget);
+      document.addEventListener('touchstart', onHoverTarget, { passive: true });
+
+      // Product cards (index/shop/related) navigate via a div's onclick, not
+      // an <a> — prefetch those the same way, on hover/touch.
+      var onHoverCard = function (e) {
+        var card = e.target.closest && e.target.closest('[onclick*="product/"]');
+        if (!card) return;
+        var attr = card.getAttribute('onclick') || '';
+        var m = attr.match(/href\s*=\s*["']([^"']+)["']/);
+        if (m) prefetchLink(m[1]);
+      };
+      document.addEventListener('mouseover', onHoverCard);
+      document.addEventListener('touchstart', onHoverCard, { passive: true });
+    }
+  })();
 </script>

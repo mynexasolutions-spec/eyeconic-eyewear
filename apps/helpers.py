@@ -2,6 +2,7 @@ import re
 import functools
 import time
 import threading
+import concurrent.futures
 import markupsafe
 import cloudinary
 import cloudinary.uploader
@@ -155,6 +156,24 @@ def handle_upload(file, folder="chasma-gallery"):
         raise RuntimeError(f"Image upload failed: {e}") from e
 
 
+def handle_uploads_parallel(files, folder="chasma-gallery"):
+    """Upload several files to Cloudinary concurrently and return their secure
+    URLs in the same order as `files` (None for empty/missing slots). Each
+    upload is an independent network round trip (1-3+ seconds); uploading a
+    product's primary + gallery images one-at-a-time (as before) meant N
+    sequential round trips — this cuts wall-clock time to roughly the slowest
+    single upload instead of the sum of all of them."""
+    results = [None] * len(files)
+    todo = [(i, f) for i, f in enumerate(files) if f and getattr(f, "filename", None)]
+    if not todo:
+        return results
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, len(todo))) as ex:
+        future_to_idx = {ex.submit(handle_upload, f, folder): i for i, f in todo}
+        for future in concurrent.futures.as_completed(future_to_idx):
+            results[future_to_idx[future]] = future.result()
+    return results
+
+
 CLOUDINARY_MAPPING = {
   "hero/hero1_classic_glasses.jpg": "https://res.cloudinary.com/dljlnkh6x/image/upload/v1777410761/chasma-gallery/hero/wu2nu6affbnpbx1qp2qs.jpg",
   "hero/hero2_sunglasses.jpg": "https://res.cloudinary.com/dljlnkh6x/image/upload/v1777410761/chasma-gallery/hero/flyndisgsvsdz5nm4mh5.jpg",
@@ -172,29 +191,41 @@ CLOUDINARY_MAPPING = {
   "women.png": "https://res.cloudinary.com/dljlnkh6x/image/upload/v1777410772/chasma-gallery/static/abrqjacgak4pj7k4yjoj.jpg"
 }
 
+def _cloudinary_optimize(url):
+    """Inject Cloudinary's auto-format + auto-quality transform (f_auto,q_auto)
+    so images are served as WebP/AVIF at a sensibly compressed size instead of
+    the raw upload. Pure bandwidth savings — no resizing, no visual change."""
+    if not url or "res.cloudinary.com" not in url or "/upload/" not in url:
+        return url
+    prefix, sep, rest = url.partition("/upload/")
+    if rest.startswith("f_auto") or rest.startswith("q_auto"):
+        return url  # already transformed
+    return f"{prefix}{sep}f_auto,q_auto/{rest}"
+
+
 def resolve_image(image_url):
     from flask import url_for
     # Default Cloudinary Placeholder
-    PLACEHOLDER = CLOUDINARY_MAPPING.get("placeholder.png", "https://res.cloudinary.com/dljlnkh6x/image/upload/v1777410770/chasma-gallery/static/we9iq7o3zsg4axrtkwbi.png")
-    
+    PLACEHOLDER = _cloudinary_optimize(CLOUDINARY_MAPPING.get("placeholder.png", "https://res.cloudinary.com/dljlnkh6x/image/upload/v1777410770/chasma-gallery/static/we9iq7o3zsg4axrtkwbi.png"))
+
     if not image_url:
         return PLACEHOLDER
-    
+
     if image_url.startswith("http"):
-        return image_url
-        
+        return _cloudinary_optimize(image_url)
+
     # Check mapping first
     clean_url = image_url.lstrip("/")
     if clean_url.startswith("images/"):
         clean_url = clean_url.replace("images/", "", 1)
-        
+
     if clean_url in CLOUDINARY_MAPPING:
-        return CLOUDINARY_MAPPING[clean_url]
-        
+        return _cloudinary_optimize(CLOUDINARY_MAPPING[clean_url])
+
     # If it's a relative path, we check if it's meant to be a static asset
     if image_url.startswith("/uploads/") or image_url.startswith("uploads/"):
         return url_for("static", filename=image_url.lstrip("/"))
-        
+
     # Fallback to static images folder for remaining local assets
     return url_for("static", filename=f"images/{image_url.lstrip('/')}")
 

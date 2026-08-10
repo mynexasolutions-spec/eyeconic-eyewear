@@ -1968,7 +1968,7 @@
     <div class="cat-grid-desktop">
       {% for cat in home_categories %}
       <div class="cat-card" onclick='window.location.href="{{ cat.cta_link or url_for("public.shop") }}";'>
-        <img src="{{ resolve_image(cat.image_url) }}" alt="{{ cat.title }}">
+        <img src="{{ resolve_image(cat.image_url) }}" alt="{{ cat.title }}" loading="lazy" decoding="async">
         <div class="cat-overlay"></div>
         <div class="cat-label"><strong>{{ cat.title }}</strong><a href="{{ cat.cta_link or url_for('public.shop') }}">{{ cat.cta_text or 'Explore Now' }}</a></div>
       </div>
@@ -1977,7 +1977,7 @@
     <div class="cat-scroll-mobile" id="cat-scroll">
       {% for cat in home_categories %}
       <div class="cat-card" onclick='window.location.href="{{ cat.cta_link or url_for("public.shop") }}";'>
-        <img src="{{ resolve_image(cat.image_url) }}" alt="{{ cat.title }}">
+        <img src="{{ resolve_image(cat.image_url) }}" alt="{{ cat.title }}" loading="lazy" decoding="async">
         <div class="cat-overlay"></div>
         <div class="cat-label"><strong>{{ cat.title }}</strong><a href="{{ cat.cta_link or url_for('public.shop') }}">{{ cat.cta_text or 'Explore' }}</a></div>
       </div>
@@ -1995,7 +1995,7 @@
     <div class="shapes-grid">
       {% for shape in trending_shapes %}
       <div class="shape-card" onclick='window.location.href="{{ url_for("public.shop", shape=shape.label) }}";'>
-        <img src="{{ shape.img }}" alt="{{ shape.label }}">
+        <img src="{{ shape.img }}" alt="{{ shape.label }}" loading="lazy" decoding="async">
         <div class="shape-name">{{ shape.label }}</div>
         {% if shape.label == 'Round' %}<div class="shape-sub">Soft & Classic</div>
         {% elif shape.label == 'Square' %}<div class="shape-sub">Bold & Modern</div>
@@ -2380,7 +2380,7 @@
   {% if home_banners %}
   {% set banner = home_banners[0] %}
   <div class="lifestyle-banner">
-    <img src="{{ resolve_image(banner.image_url) }}" alt="{{ banner.title }}">
+    <img src="{{ resolve_image(banner.image_url) }}" alt="{{ banner.title }}" loading="lazy" decoding="async">
     <div class="lifestyle-overlay"></div>
     <div class="lifestyle-content">
       {% if banner.badge_text %}<p class="section-label">{{ banner.badge_text }}</p>{% endif %}
@@ -2406,7 +2406,7 @@
           <p class="review-text">{{ t.body }}</p>
           <div class="reviewer">
             {% if t.image_url %}
-            <div class="reviewer-avatar" style="overflow:hidden; padding:0;"><img src="{{ resolve_image(t.image_url) }}" alt="{{ t.title }}" style="width:100%; height:100%; object-fit:cover;"></div>
+            <div class="reviewer-avatar" style="overflow:hidden; padding:0;"><img src="{{ resolve_image(t.image_url) }}" alt="{{ t.title }}" style="width:100%; height:100%; object-fit:cover;" loading="lazy" decoding="async"></div>
             {% else %}
             <div class="reviewer-avatar">{{ (_parts[0][0] ~ (_parts[-1][0] if _parts|length > 1 else '')) | upper }}</div>
             {% endif %}
@@ -2442,12 +2442,12 @@
       {% endset %}
       {% if tile.link_url %}
       <a class="insta-item" href="{{ tile.link_url }}" target="_blank" rel="noopener">
-        <img src="{{ resolve_image(tile.image_url) }}" alt="{{ tile.title or 'Community style' }}">
+        <img src="{{ resolve_image(tile.image_url) }}" alt="{{ tile.title or 'Community style' }}" loading="lazy" decoding="async">
         <div class="insta-overlay">{{ _icon }}</div>
       </a>
       {% else %}
       <div class="insta-item">
-        <img src="{{ resolve_image(tile.image_url) }}" alt="{{ tile.title or 'Community style' }}">
+        <img src="{{ resolve_image(tile.image_url) }}" alt="{{ tile.title or 'Community style' }}" loading="lazy" decoding="async">
         <div class="insta-overlay">{{ _icon }}</div>
       </div>
       {% endif %}

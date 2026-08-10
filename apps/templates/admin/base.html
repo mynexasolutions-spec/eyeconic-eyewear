@@ -172,6 +172,27 @@
       });
     }
   })();
+
+  // Disable + spin the submit button on any CRUD form (save/delete/toggle/
+  // move) while its request is in flight — stops double-submits and shows
+  // the admin something is actually happening on slower connections.
+  // Skipped automatically if the form's own onsubmit cancels it (e.g. a
+  // "Delete this item?" confirm() the admin says no to).
+  document.addEventListener('submit', function (e) {
+    var form = e.target;
+    if (!(form instanceof HTMLFormElement) || e.defaultPrevented) return;
+    var btn = e.submitter || form.querySelector('button[type="submit"]:not([disabled])');
+    if (!btn || btn.disabled || btn.hasAttribute('data-no-spin')) return;
+    btn.disabled = true;
+    btn.style.opacity = '0.7';
+    btn.style.cursor = 'not-allowed';
+    btn.style.pointerEvents = 'none';
+    if (btn.tagName === 'BUTTON') {
+      var spinner = document.createElement('span');
+      spinner.className = 'btn-spinner-inline';
+      btn.insertBefore(spinner, btn.firstChild);
+    }
+  });
 </script>
 </body>
 </html>
