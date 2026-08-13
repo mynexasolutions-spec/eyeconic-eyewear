@@ -454,8 +454,11 @@
     opacity: 0.85;
     animation: btn-spin-nav 0.6s linear infinite;
   }
+
   @keyframes btn-spin-nav {
-    to { transform: rotate(360deg); }
+    to {
+      transform: rotate(360deg);
+    }
   }
 </style>
 
@@ -598,15 +601,19 @@
     <div class="mobile-nav-divider"></div>
 
     <div class="mobile-section-label">Accessories</div>
-    <a href="{{ url_for('public.shop', category='accessories-contacts-solutions') }}" class="mobile-nav-link sub">&#8627; Contact Solutions</a>
-    <a href="{{ url_for('public.shop', category='accessories-lens-cleaners') }}" class="mobile-nav-link sub">&#8627; Lens Cleaners</a>
-    <a href="{{ url_for('public.shop', category='accessories') }}" class="mobile-nav-link sub" style="color:var(--gold);">All Accessories &rarr;</a>
+    <a href="{{ url_for('public.shop', category='accessories-contacts-solutions') }}"
+      class="mobile-nav-link sub">&#8627; Contact Solutions</a>
+    <a href="{{ url_for('public.shop', category='accessories-lens-cleaners') }}" class="mobile-nav-link sub">&#8627;
+      Lens Cleaners</a>
+    <a href="{{ url_for('public.shop', category='accessories') }}" class="mobile-nav-link sub"
+      style="color:var(--gold);">All Accessories &rarr;</a>
 
     <div class="mobile-nav-divider"></div>
 
     <div class="mobile-section-label">Collections</div>
     <a href="{{ url_for('public.shop', featured='1') }}" class="mobile-nav-link sub">&#8627; Featured</a>
-    <a href="{{ url_for('public.shop', on_sale='1') }}" class="mobile-nav-link sub" style="color:#e53e3e;">&#8627; Sale</a>
+    <a href="{{ url_for('public.shop', on_sale='1') }}" class="mobile-nav-link sub" style="color:#e53e3e;">&#8627;
+      Sale</a>
     <a href="{{ url_for('public.shop', sort='created_at_desc') }}" class="mobile-nav-link sub">&#8627; New Arrivals</a>
     <a href="{{ url_for('public.shop', max_price='999') }}" class="mobile-nav-link sub">&#8627; Under ₹999</a>
 
